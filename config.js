@@ -1,0 +1,268 @@
+// Réglages du visualiseur — modifiez les valeurs puis rechargez la page.
+// (Ce fichier est volontairement simple : aucune compilation n'est nécessaire.)
+
+window.VIEWER_CONFIG = {
+
+  // ---------------------------------------------------------------- LUMIÈRE
+  light: {
+    // Intensité générale de la lumière. 1 = valeur d'origine.
+    // Plage utile : 0.4 (sombre) à 2 (très lumineux).
+    intensity: 1,
+
+    // Bornes du curseur « Luminosité » dans le panneau de réglages.
+    intensityMin: 0.4,
+    intensityMax: 2,
+
+    // "fixe"   : éclairage d'origine, identique quel que soit le point de vue.
+    // "souris" : la lumière suit le curseur de la souris.
+    mode: 'fixe',
+
+    // Réglages utilisés uniquement en mode "souris".
+    souris: {
+      // Luminosité du fond d'environnement (0 = noir, 1 = blanc).
+      // Plus la valeur est basse, plus la direction de la lumière est marquée,
+      // mais plus l'ensemble est sombre.
+      ambiance: 0.62,
+
+      // Force de la source lumineuse principale (0 à 1).
+      intensiteSource: 1,
+
+      // Taille de la source : petite = ombres franches, grande = lumière douce.
+      // Exprimée en fraction de la largeur de l'environnement (0.05 à 0.5).
+      tailleSource: 0.22,
+    },
+  },
+
+  // --------------------------------------------------------------- MATIÈRE
+  // Appliqué à la volée au modèle : inutile de régénérer les fichiers .glb.
+  matiere: {
+    // Rugosité de la surface : 0 = miroir, 1 = totalement mat.
+    // ~0.7 donne un reflet discret d'écailles ; baissez pour plus de brillance.
+    rugosite: 0.7,
+
+    // Aspect métallique : 0 pour un spécimen naturel. À laisser à 0
+    // sauf effet volontairement métallique.
+    metal: 0.8,
+
+    // Opacité globale du modèle. Elle multiplie l'opacité propre des matériaux
+    // (les membranes des nageoires restent donc corrigées à 45 % de cette valeur)
+    // sans modifier l'opacité des calques de peinture ou de région.
+    opacite: 1,
+  },
+
+  // ---------------------------------------------------------------- OMBRE
+  ombre: {
+    // Intensité de l'ombre portée au sol (0 = aucune, 1 = très marquée).
+    intensite: 0.7,
+    // Netteté du contour de l'ombre (0 = nette, 1 = très floue).
+    douceur: 0.8,
+    // Taille du plan qui reçoit l'ombre, en multiple de la largeur du modèle.
+    // Augmentez si l'ombre semble coupée sur les bords.
+    taillePlan: 1.8,
+    // Hauteur au-dessus du socle jusqu'à laquelle le modèle projette de
+    // l'ombre, en multiple de sa hauteur. Plus c'est bas, plus l'ombre est
+    // concentrée sous le spécimen.
+    hauteur: 0.7,
+  },
+
+  // ---------------------------------------------------------------- CAMÉRA
+  camera: {
+    // Champ de vision vertical, en degrés. Plus la valeur est basse, plus la
+    // perspective est écrasée (effet téléobjectif). 30 = cadrage identique à
+    // l'ancien visualiseur.
+    champVision: 30,
+    // Air autour du modèle au chargement. 1 = le modèle touche exactement les
+    // bords de la fenêtre ; 1.22 reproduit le cadrage de l'ancien visualiseur.
+    marge: 1.22,
+
+    // Distances minimale et maximale entre la caméra et le modèle, en mètres.
+    distanceMin: 0.4,
+    distanceMax: 14,
+    // Inertie des mouvements de caméra (0 = arrêt net, 0.2 = très glissant).
+    amortissement: 0.08,
+  },
+
+  // -------------------------------------------------------------- COULEURS
+  // Palette proposée pour les calques : annotations, peinture, régions.
+  // Ajoutez ou retirez des couleurs librement ; la pastille arc-en-ciel
+  // permet de toujours en choisir une hors palette.
+  couleurs: [
+    '#c9553d', '#d99a35', '#c8b23f', '#4f9066', '#3d7ab8',
+    '#8360b8', '#b8508a', '#7a6a5d', '#2b2b28', '#f2f1ec',
+  ],
+
+  // -------------------------------------------------------------- PEINTURE
+  peinture: {
+    // Résolution de l'atlas de peinture, en pixels de côté. 2048 convient à
+    // des régions et des contours ; montez à 4096 pour des traits très fins
+    // (coût : 4 fois plus de mémoire vidéo), descendez à 1024 sur machine
+    // modeste.
+    resolutionAtlas: 2048,
+
+    // Diamètre du pinceau au chargement, en MILLIMÈTRES SUR LA SURFACE du
+    // spécimen — pas en pixels d'écran. Un trait garde donc sa taille réelle
+    // quel que soit le zoom.
+    taille: 20,
+    tailleMin: 1,
+    tailleMax: 80,
+
+    // Diamètre de la gomme au chargement, mêmes unités.
+    tailleGomme: 24,
+
+    // Netteté du bord du trait : 0 = très flou, 1 = net.
+    durete: 0.55,
+
+    // Empêche le pinceau de traverser une paroi fine (une nageoire) et de
+    // peindre l'autre côté. C'est le produit scalaire minimal entre la normale
+    // de la surface et celle du trait : 0 = tout ce qui est de face,
+    // 0.5 = seulement ce qui est bien orienté pareil, -1 = aucune protection.
+    seuilNormale: 0.0,
+
+    // Espacement des empreintes le long du trait, en fraction du rayon.
+    espacement: 0.25,
+
+    // Nombre de passes de dilatation qui comblent les coutures de l'atlas UV.
+    // 0 laisse apparaître de fines fissures claires le long des îlots.
+    dilatations: 2,
+  },
+
+  // ---------------------------------------------------------------- MESURE
+  mesure: {
+    // Échelle automatique : une longueur affichée comme 59 cm dans les unités
+    // du modèle correspond à 19 cm sur le spécimen réel. Longueurs, aires et
+    // volumes sont convertis respectivement avec ce rapport, son carré et son cube.
+    longueurModeleReference: 0.59,
+    longueurReelleReference: 0.19,
+
+    // Mode de mesure au chargement.
+    //   'droite'  : distance à vol d'oiseau entre deux points, comme un pied
+    //               à coulisse. C'est la mesure la plus reproductible.
+    //   'surface' : plus court chemin EN RESTANT SUR LE MAILLAGE, comme un
+    //               mètre ruban posé sur le spécimen. Sur un corps courbe les
+    //               deux diffèrent beaucoup : le mode fait partie de la mesure
+    //               et est enregistré avec elle.
+    mode: 'droite',
+
+    // Épaisseur du trait de mesure, en pixels.
+    epaisseur: 2,
+
+    // AIRE ET PÉRIMÈTRE D'UN CALQUE DE PEINTURE — résolution de la grille de
+    // calcul, en pixels de côté. La peinture n'est pas un ensemble de
+    // triangles : son aire est l'intégrale de sa couverture sur la surface, et
+    // c'est sur cette grille qu'elle est intégrée.
+    //
+    // Mesuré sur ce spécimen, contre le calcul exact sur le maillage :
+    //
+    //          256      512      1024     2048
+    //   aire   +0,8 %   +0,1 %   −0,1 %   −0,0 %
+    //   périm. −31 %    −21 %    −13 %    −5 %
+    //
+    // L'aire est donc juste dès 512. Le périmètre, lui, est sous-estimé : voir
+    // eviterCoutures ci-dessous. 1024 est le compromis retenu ; 2048 divise
+    // encore l'écart par deux, au prix de 64 Mo de mémoire vidéo et d'un calcul
+    // quatre fois plus long à chaque sélection de calque.
+    resolution: 1024,
+
+    // Ignore le contour qui longe une couture de l'atlas UV. Quand une zone
+    // peinte passe d'un îlot UV à un autre, l'atlas montre un bord des deux
+    // côtés alors qu'il n'y en a aucun sur le spécimen : la peinture continue,
+    // simplement. Sans cette correction le périmètre AUGMENTE indéfiniment
+    // avec la résolution (+11 %, +25 %, +34 %, +47 %) au lieu de converger.
+    // Le prix à payer est une marge d'un pixel autour de chaque îlot, dans
+    // laquelle du vrai bord est perdu aussi — d'où la sous-estimation.
+    // À ne passer à false que pour comparer.
+    eviterCoutures: true,
+  },
+
+  // ------------------------------------------------------------- SÉLECTION
+  selection: {
+    // BAGUETTE MAGIQUE — la propagation s'arrête quand l'angle entre deux
+    // faces voisines dépasse cette valeur, en degrés. Baissez pour que la
+    // sélection s'arrête plus tôt sur les arêtes douces, montez pour franchir
+    // les plis.
+    angleMax: 32,
+
+    // Tolérance de couleur de la baguette, de 0 à 255. La propagation
+    // s'arrête quand la texture s'écarte trop de la couleur de départ.
+    // 255 = la couleur est ignorée, seule la géométrie compte.
+    tolerance: 42,
+
+    // Garde-fou : nombre maximal de faces qu'une seule baguette peut prendre.
+    maxFaces: 40000,
+
+    // LASSO — false : seules les faces tournées vers vous sont prises.
+    // true : le lasso traverse et prend aussi l'autre côté du spécimen.
+    lassoTraversant: false,
+
+    // TRANSFERT ENTRE SESSIONS — une région est définie sur un maillage ; sur
+    // une autre capture, les faces sont retrouvées par proximité. La distance
+    // acceptée est ce facteur MULTIPLIÉ PAR LA TAILLE MOYENNE D'UNE FACE du
+    // maillage, et non une distance fixe.
+    //
+    // C'est important : sur ce spécimen une arête mesure environ 2 cm, donc un
+    // seuil choisi d'après le résidu de recalage (5 mm) serait plus petit
+    // qu'un seul triangle et ne retrouverait presque rien. Le facteur s'adapte
+    // tout seul si vous ajoutez une capture plus fine.
+    // 0.6 = un peu plus d'une demi-face. Montez si la région se troue sur les
+    // autres sessions, baissez si elle déborde.
+    facteurTransfert: 0.6,
+
+    // CONTOUR — épaisseur du trait en pixels, et hauteur à laquelle il flotte
+    // au-dessus de la surface (en mètres) pour ne pas se battre avec elle.
+    epaisseurContour: 3,
+    decalageContour: 0.0004,
+
+    // Surbrillance de la sélection en cours.
+    couleurApercu: '#2f6fd0',
+    opaciteApercu: 0.45,
+  },
+
+  // ----------------------------------------------------------------- RENDU
+  rendu: {
+    // Courbe de conversion des couleurs calculées vers l'écran.
+    //   'neutre'   : Khronos PBR Neutral — préserve les teintes, peu de
+    //                saturation dans les hautes lumières. C'est le réglage
+    //                le plus proche de l'ancien visualiseur.
+    //   'aces'     : plus contrasté, hautes lumières plus douces (cinéma).
+    //   'agx'      : très doux dans les hautes lumières, un peu désaturé.
+    //   'aucun'    : aucune conversion, les zones vives sont écrêtées.
+    // Si le rendu vous paraît différent d'avant, c'est le premier réglage
+    // à essayer.
+    tonemapping: 'neutre',
+
+    // Plafond de la densité de pixels. 2 = net sur écran Retina ; descendez
+    // à 1 si l'affichage rame sur une machine modeste.
+    densitePixelsMax: 2,
+
+    // Lissage des bords (antialiasing). Coûteux sur mobile.
+    lissage: true,
+  },
+
+  // ------------------------------------------------------------------ FOND
+  fond: {
+    // Couleur de fond au chargement.
+    couleur: '#ecebe7',
+    // Couleurs proposées dans le panneau de réglages.
+    palette: ['#ecebe7', '#ffffff', '#3a352c', '#151515', '#0c1b2e'],
+  },
+
+  // --------------------------------------------------------------- AFFICHAGE
+  affichage: {
+    // Panneau de réglages (à gauche) ouvert au chargement.
+    // Note : une fois que vous repliez ou dépliez un panneau, votre choix est
+    // mémorisé par le navigateur et prend le pas sur ce réglage.
+    panneauOuvert: true,
+
+    // Panneau de calques (à droite) ouvert au chargement.
+    panneauCalquesOuvert: true,
+    // Vitesse de la rotation automatique, en degrés par seconde.
+    vitesseRotation: 18,
+
+    // Mode « Toutes les sessions ».
+    // 'auto' (recommandé) : chaque capture pèse exactement 1/3 du résultat,
+    // ce qui donne une vraie moyenne des trois sans délaver les couleurs.
+    // Vous pouvez forcer une valeur (ex. 0.5) pour appliquer la même opacité
+    // à toutes les couches : l'effet est plus fantomatique, le fond ressort.
+    opaciteComposite: 'auto',
+  },
+};

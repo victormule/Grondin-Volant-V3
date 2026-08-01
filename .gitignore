@@ -1,0 +1,69 @@
+# Métadonnées macOS. Les fichiers « ._quelquechose » sont des forks de
+# ressources créés par le Finder sur les volumes non-HFS ; ils n'ont aucun
+# contenu utile et il y en a plusieurs centaines dans sessions/.
+._*
+.DS_Store
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+
+# Outils
+node_modules/
+*.log
+
+# ---------------------------------------------------------------------------
+# HORS SITE
+#
+# Le dépôt est déployé tel quel par Netlify : il ne contient que ce que le
+# navigateur va chercher. Documentation, notes de conception et outils restent
+# sur le disque — ils ne sont pas supprimés, seulement pas publiés.
+README.md
+README.txt
+PLAN_ANNOTATIONS.md
+annotations/LISEZ-MOI.txt
+
+# Ancienne version, gardée pour comparaison.
+index-model-viewer.html
+
+# Script de nettoyage des nageoires, hors chaîne de rendu.
+tools_clean_fins.py
+
+# Métadonnées de l'export dür.air : aucun code ne les lit.
+project_metadata.json
+sessions/*/session_metadata.json
+sessions/_alignment_transforms.json
+
+# ---------------------------------------------------------------------------
+# SOURCES DE PHOTOGRAMMÉTRIE
+#
+# Le visualiseur ne lit qu'un fichier par session : photogrammetry/model.glb
+# (plus le .usdz pour la vue AR sur iOS). Tout le reste de sessions/ est la
+# matière première dont ces deux fichiers ont été tirés — 400 Mo de photos et
+# de formats intermédiaires que le site ne demande jamais.
+#
+# Ces sources ont de la valeur : elles sont irremplaçables et permettent de
+# régénérer les modèles. Elles n'ont simplement rien à faire dans un dépôt Git,
+# qui conserve chaque version de chaque binaire pour toujours. Gardez-les
+# sauvegardées ailleurs (disque externe, stockage objet).
+
+# Les photos d'origine de chaque session.
+sessions/*/captures/
+
+# Formats intermédiaires : le .glb livré en contient déjà la géométrie et les
+# textures.
+sessions/*/photogrammetry/*.obj
+sessions/*/photogrammetry/*.mtl
+sessions/*/photogrammetry/*_textures/
+sessions/*/photogrammetry/*_metadata.json
+
+# Session non référencée par sessions.json : rien ne la charge.
+sessions/91D4BE57-FE01-49B7-847D-A0044DAF6CC2/
+
+# Les .glb servis embarquent leurs textures en WebP (11,4 Mo → 1,9 Mo). Les
+# versions d'origine, à textures PNG, sont conservées à côté pour pouvoir
+# refaire la conversion à une autre qualité — mais elles pèsent six fois plus
+# et le site ne les lit jamais.
+#
+#   gltf-transform webp model.original.glb model.glb --quality 90
+*.original.glb

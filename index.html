@@ -1,0 +1,1421 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Visualisation interactive de sessions de photogrammétrie 3D.">
+  <title>Dactylopterus Volantis — Visualisation 3D</title>
+
+  <!-- Sans cette ligne le navigateur réclame /favicon.ico et journalise une
+       erreur 404 à chaque chargement. Remplacez la valeur par le chemin d'une
+       vraie icône si vous en voulez une dans l'onglet. -->
+  <link rel="icon" href="data:,">
+
+  <script src="./config.js"></script>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --background: #ecebe7;
+      --panel: rgba(255, 255, 255, 0.9);
+      --text: #181817;
+      --muted: #65635e;
+      --border: rgba(24, 24, 23, 0.16);
+      --button: #181817;
+      --button-text: #ffffff;
+      --panel-width: 19rem;
+      --panneau-droit: 21rem;
+      --surbrillance: rgba(24, 24, 23, 0.07);
+      --accent: #3d7ab8;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --panel: rgba(28, 28, 27, 0.9);
+        --text: #f3f2ee;
+        --muted: #aaa7a0;
+        --border: rgba(255, 255, 255, 0.16);
+        --button: #f3f2ee;
+        --button-text: #151515;
+        --surbrillance: rgba(255, 255, 255, 0.09);
+        --accent: #6ba3dd;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    /* `display` set on a class otherwise beats the hidden attribute. */
+    [hidden] { display: none !important; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      /* Mobile browsers shrink the viewport when their toolbars slide away;
+         100dvh follows that, 100% does not and leaves a strip of page below
+         the fold. */
+      height: 100dvh;
+      margin: 0;
+      overflow: hidden;
+      background: var(--background);
+      color: var(--text);
+      /* A long press on a tablet must not offer to select or to copy the
+         interface while the finger is drawing on the specimen. */
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Text the user actually writes stays selectable. */
+    input, textarea, .fiche-rendu { -webkit-user-select: text; user-select: text; }
+
+    /* The WebGL canvas fills the window and is transparent: the page
+       background shows through, exactly as before. */
+    #scene {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    #scene canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    button {
+      appearance: none;
+      padding: 0.5rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+
+    button:hover { background: rgba(128, 128, 128, 0.14); }
+    button:focus-visible { outline: 3px solid currentColor; outline-offset: 2px; }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    /* ---------------------------------------------------------- side panel */
+
+    .panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      gap: 1.15rem;
+      width: var(--panel-width);
+      max-width: 100%;
+      height: 100%;
+      padding: 1rem 1rem 1.5rem;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      transition: transform 260ms ease;
+    }
+
+    .panel.collapsed { transform: translateX(-100%); }
+
+    .panel-toggle {
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      z-index: 5;
+      min-width: 2.6rem;
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      transition: left 260ms ease, right 260ms ease;
+    }
+
+    .panel-toggle.panel-open { left: calc(var(--panel-width) + 1rem); }
+
+    /* ------------------------------------------------- panneau de calques */
+
+    .panneau-calques {
+      left: auto;
+      right: 0;
+      width: var(--panneau-droit);
+      gap: 0.75rem;
+      padding: 1rem 0.85rem 1rem;
+      overflow: hidden;
+      border-right: none;
+      border-left: 1px solid var(--border);
+    }
+
+    .panneau-calques.collapsed { transform: translateX(100%); }
+
+    .toggle-droite { left: auto; right: 1rem; }
+    .toggle-droite.panel-open { left: auto; right: calc(var(--panneau-droit) + 1rem); }
+
+    .panneau-entete {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .historique { display: flex; gap: 0.25rem; }
+
+    .bouton-icone {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.85rem;
+      height: 1.85rem;
+      padding: 0;
+      font-size: 0.9rem;
+      line-height: 1;
+    }
+
+    button:disabled { opacity: 0.35; cursor: default; }
+    button:disabled:hover { background: transparent; }
+
+    .barre-calques {
+      display: flex;
+      gap: 0.3rem;
+    }
+
+    .barre-calques button {
+      flex: 1 1 0;
+      padding: 0.4rem 0.5rem;
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+
+    .menu-ancre { position: relative; flex: 1 1 0; display: flex; }
+
+    .menu {
+      position: absolute;
+      top: calc(100% + 0.3rem);
+      left: 0;
+      z-index: 6;
+      display: none;
+      flex-direction: column;
+      min-width: 10rem;
+      padding: 0.25rem;
+      border: 1px solid var(--border);
+      border-radius: 0.6rem;
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+    }
+
+    .menu.ouvert { display: flex; }
+
+    .menu-option {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border: none;
+      border-radius: 0.4rem;
+      text-align: left;
+      font-size: 0.78rem;
+      padding: 0.4rem 0.5rem;
+    }
+
+    .menu-icone { width: 1rem; text-align: center; color: var(--muted); }
+
+    /* --------------------------------------------------------- la liste */
+
+    .calques-liste {
+      flex: 1 1 auto;
+      min-height: 6rem;
+      overflow-y: auto;
+      margin: 0 -0.35rem;
+      padding: 0.15rem 0.35rem;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .calques-vide, .inspecteur-vide {
+      margin: 1.1rem 0.3rem;
+      color: var(--muted);
+      font-size: 0.74rem;
+      line-height: 1.45;
+    }
+
+    .calque {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      position: relative;
+      padding: 0.28rem 0.35rem;
+      padding-left: calc(0.35rem + var(--profondeur, 0) * 0.85rem);
+      border-radius: 0.4rem;
+      cursor: default;
+      user-select: none;
+    }
+
+    .calque:hover { background: var(--surbrillance); }
+
+    .calque.selectionne {
+      background: var(--button);
+      color: var(--button-text);
+    }
+
+    .calque.selectionne .calque-chevron,
+    .calque.selectionne .calque-verrou { color: inherit; opacity: 0.7; }
+
+    .calque.masque .calque-nom { opacity: 0.4; }
+    .calque.verrouille .calque-nom { font-style: italic; }
+    .calque.en-deplacement { opacity: 0.4; }
+
+    /* Out of scope for the session on screen: still there, just not concerned. */
+    .calque.hors-portee .calque-nom { opacity: 0.45; text-decoration: line-through; }
+
+    .calque-chevron {
+      width: 0.9rem;
+      padding: 0;
+      border: none;
+      background: none;
+      color: var(--muted);
+      font-size: 0.6rem;
+      line-height: 1;
+      text-align: center;
+      flex: none;
+    }
+
+    .calque-chevron:hover { background: none; }
+
+    .calque-oeil {
+      display: flex;
+      width: 1.25rem;
+      height: 1.25rem;
+      padding: 0;
+      border: none;
+      background: none;
+      color: inherit;
+      flex: none;
+    }
+
+    .calque-oeil:hover { background: none; opacity: 0.6; }
+    .calque.masque .calque-oeil { opacity: 0.35; }
+
+    .calque-oeil svg, .calque-verrou svg {
+      width: 100%;
+      height: 100%;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .calque-pastille {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.1rem;
+      height: 1.1rem;
+      flex: none;
+      border-radius: 0.28rem;
+      color: #fff;
+      font-size: 0.6rem;
+      line-height: 1;
+    }
+
+    .calque-nom {
+      flex: 1 1 auto;
+      overflow: hidden;
+      font-size: 0.78rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .calque-nom-champ {
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 0.1rem 0.3rem;
+      border: 1px solid var(--accent);
+      border-radius: 0.3rem;
+      background: var(--background);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.78rem;
+    }
+
+    .calque-verrou { display: flex; width: 0.9rem; height: 0.9rem; color: var(--muted); flex: none; }
+
+    /* Only shown where dragging the row itself would be the scroll gesture. */
+    .calque-poignee {
+      display: none;
+      width: 1.6rem;
+      height: 1.6rem;
+      flex: none;
+      color: var(--muted);
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .calque-poignee svg {
+      width: 100%;
+      height: 100%;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+    }
+
+    .calque.depot-avant::before,
+    .calque.depot-apres::after {
+      content: '';
+      position: absolute;
+      left: 0.35rem;
+      right: 0.35rem;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    .calque.depot-avant::before { top: -1px; }
+    .calque.depot-apres::after { bottom: -1px; }
+    .calque.depot-dedans { box-shadow: inset 0 0 0 2px var(--accent); }
+
+    /* ----------------------------------------------------- l'inspecteur */
+
+    .inspecteur {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      max-height: 40%;
+      overflow-y: auto;
+      flex: none;
+    }
+
+    .champ {
+      width: 100%;
+      padding: 0.3rem 0.45rem;
+      border: 1px solid var(--border);
+      border-radius: 0.4rem;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 0.78rem;
+    }
+
+    .champ-couleur {
+      width: 100%;
+      height: 1.7rem;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 0.4rem;
+      background: none;
+      cursor: pointer;
+    }
+
+    .case {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .case input { accent-color: var(--button); }
+
+    .inspecteur-fin {
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .bandeau-brouillon {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4rem;
+      padding: 0.35rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 0.45rem;
+      background: var(--surbrillance);
+      color: var(--muted);
+      font-size: 0.7rem;
+    }
+
+    .bandeau-action {
+      padding: 0.2rem 0.45rem;
+      font-size: 0.68rem;
+      white-space: nowrap;
+    }
+
+    .panneau-pied { display: flex; flex: none; }
+    .panneau-pied button { flex: 1 1 auto; font-size: 0.75rem; }
+
+    /* ---------------------------------------------------- barre d'outils */
+
+    /* Pinned to the panel's inner edge, and staying put when it folds away:
+       annotating full screen has to remain possible. */
+    .barre-outils {
+      position: fixed;
+      top: 50%;
+      right: calc(var(--panneau-droit) + 0.75rem);
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.25rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      transform: translateY(-50%);
+      transition: right 260ms ease;
+    }
+
+    .panneau-calques.collapsed ~ .barre-outils,
+    body:has(.panneau-calques.collapsed) .barre-outils { right: 0.75rem; }
+
+    .outil {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.2rem;
+      height: 2.2rem;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      color: var(--muted);
+    }
+
+    .outil svg {
+      width: 1.15rem;
+      height: 1.15rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.4;
+      stroke-linejoin: round;
+    }
+
+    .outil[aria-pressed="true"] {
+      background: var(--button);
+      color: var(--button-text);
+    }
+
+    /* Tool settings behave like menus: shown only while the pointer is on the
+       tool or on the panel. Position is set from JavaScript, next to whichever
+       tool is hovered. */
+    .reglages-outil {
+      position: fixed;
+      z-index: 6;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      width: 12rem;
+      max-height: 100dvh;
+      padding: 0.7rem 0.8rem;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      border: 1px solid var(--border);
+      border-radius: 0.7rem;
+      background: var(--panel);
+      backdrop-filter: blur(14px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.13);
+    }
+
+    /* Where the work will land. The one line that ties tool to layer. */
+    .reglages-cible {
+      margin: 0;
+      padding: 0.3rem 0.45rem;
+      border-radius: 0.4rem;
+      background: var(--surbrillance);
+      font-size: 0.72rem;
+      line-height: 1.3;
+    }
+
+    .modes button { padding: 0.3rem 0; font-size: 0.78rem; }
+
+    .palette { gap: 0.3rem; }
+    .palette .swatch { width: 1.25rem; height: 1.25rem; }
+    .palette .swatch.choisie { box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--text); }
+    .palette .swatch-custom input[type="color"] { width: 1.8rem; height: 1.8rem; }
+
+    .reglages-outil .barre-calques button { padding: 0.3rem 0.4rem; }
+    #selCreerRegion { width: 100%; font-size: 0.74rem; }
+
+    .trace-lasso {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .trace-lasso polyline {
+      fill: rgba(47, 111, 208, 0.12);
+      stroke: var(--accent);
+      stroke-width: 1.5;
+      stroke-dasharray: 5 4;
+    }
+
+    .reglages-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.68rem;
+      line-height: 1.35;
+    }
+
+    /* --------------------------------------------------------- mesures */
+
+    /* The figure is the annotation, so unlike a pin's label it is never
+       hidden until hovered. */
+    .mesure-etiquette {
+      position: absolute;
+      top: 0;
+      left: 0;
+      padding: 0.1rem 0.4rem;
+      margin: -0.7rem 0 0 -1.4rem;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--couleur, var(--accent));
+      border-radius: 0.35rem;
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+      font-size: 0.7rem;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.35;
+      white-space: nowrap;
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    .mesure-total {
+      border-left-width: 3px;
+      background: var(--button);
+      color: var(--button-text);
+      border-color: transparent;
+      font-weight: 600;
+    }
+
+    .mesure-etiquette.cachee { display: none; }
+
+    /* Read-out of what a layer measures. Figures right-aligned and tabular so
+       two layers can be compared by running an eye down the column. */
+    .releve-ligne {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.6rem;
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+
+    .releve-ligne strong {
+      color: var(--text);
+      font-size: 0.78rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .releve:empty { display: none; }
+
+    /* --------------------------------------------------------- épingles */
+
+    .couche-epingles {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .epingle-liaisons {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .epingle-liaison {
+      fill: none;
+      stroke: var(--couleur, var(--accent));
+      stroke-width: 1.1;
+      stroke-dasharray: 2 4.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .epingle-point {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 0.48rem;
+      min-width: 0;
+      height: 0.48rem;
+      margin: -0.24rem 0 0 -0.24rem;
+      padding: 0;
+      border: 1px solid var(--panel);
+      border-radius: 50%;
+      background: var(--couleur, var(--accent));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--couleur, var(--accent)) 55%, transparent);
+      pointer-events: auto;
+      will-change: transform;
+    }
+
+    .epingle-point:hover,
+    .epingle-point.selectionnee {
+      width: 0.62rem;
+      height: 0.62rem;
+      margin: -0.31rem 0 0 -0.31rem;
+      background: var(--couleur, var(--accent));
+    }
+
+    .epingle-etiquette {
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.22rem;
+      width: max-content;
+      min-width: 5rem;
+      max-width: 14rem;
+      padding: 0.34rem 0.55rem;
+      border: 1px solid color-mix(in srgb, var(--couleur, var(--accent)) 72%, #000000);
+      border-radius: 0.48rem;
+      background: var(--couleur, var(--accent));
+      color: var(--texte-etiquette, #ffffff);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+      font-size: 0.72rem;
+      line-height: 1.28;
+      text-align: left;
+      pointer-events: auto;
+      transition: transform 180ms cubic-bezier(0.22, 0.72, 0.2, 1),
+        opacity 140ms ease, filter 140ms ease, box-shadow 140ms ease;
+      will-change: transform;
+    }
+
+    .epingle-etiquette:hover,
+    .epingle-etiquette.depliee {
+      background: var(--couleur, var(--accent));
+      filter: brightness(1.06) saturate(1.04);
+      box-shadow: 0 5px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .epingle-etiquette.selectionnee {
+      border-color: var(--texte-etiquette, #ffffff);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--texte-etiquette, #ffffff) 65%, transparent),
+        0 4px 14px rgba(0, 0, 0, 0.2);
+    }
+
+    .epingle-etiquette.dans-groupe { padding-right: 1.15rem; }
+
+    .epingle-etiquette.dans-groupe::after {
+      content: '';
+      position: absolute;
+      top: 0.48rem;
+      right: 0.46rem;
+      width: 0.4rem;
+      height: 0.4rem;
+      border: 1px solid color-mix(in srgb, var(--couleur-groupe) 72%, #000000);
+      border-radius: 50%;
+      background: var(--couleur-groupe);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--texte-etiquette) 42%, transparent);
+    }
+
+    .epingle-etiquette-titre {
+      display: block;
+      overflow: hidden;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .epingle-description {
+      display: none;
+      overflow: hidden;
+      max-width: 13rem;
+      color: color-mix(in srgb, var(--texte-etiquette, #ffffff) 82%, transparent);
+      font-weight: 400;
+      overflow-wrap: anywhere;
+    }
+
+    .epingle-etiquette.depliee .epingle-description { display: block; }
+
+    .epingle-point.cachee,
+    .epingle-etiquette.cachee,
+    .epingle-liaison.cachee { display: none; }
+
+    /* The pin tool turns the whole view into a target. */
+    body[data-outil="epingle"] #scene canvas,
+    body[data-outil="pinceau"] #scene canvas,
+    body[data-outil="gomme"] #scene canvas,
+    body[data-outil="baguette"] #scene canvas,
+    body[data-outil="mesure"] #scene canvas,
+    body[data-outil="lasso"] #scene canvas { cursor: crosshair; }
+
+    /* Markers would only get in the way of painting or selecting. Measurement
+       figures stay: they are what the ruler is for. */
+    body[data-outil="pinceau"] #epingles,
+    body[data-outil="gomme"] #epingles,
+    body[data-outil="baguette"] #epingles,
+    body[data-outil="lasso"] #epingles { display: none; }
+
+    /* ------------------------------------------------------------ fiche */
+
+    /* Takes over the panel: a photo and a paragraph need the room. The panel
+       background is translucent, so the list underneath is hidden outright
+       rather than covered — a card you can read the layer list through is
+       worse than either. */
+    .panneau-calques.fiche-ouverte > *:not(.fiche) { display: none; }
+
+    .fiche {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      padding: 1rem 0.85rem;
+      overflow-y: auto;
+    }
+
+    .fiche-entete {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .fiche-retour {
+      padding: 0.25rem 0.55rem;
+      font-size: 0.72rem;
+    }
+
+    .fiche-titre { font-weight: 600; }
+
+    .fiche-rendu {
+      min-height: 4.5rem;
+      padding: 0.4rem 0.5rem;
+      border: 1px dashed var(--border);
+      border-radius: 0.45rem;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      cursor: text;
+    }
+
+    .fiche-rendu:hover { background: var(--surbrillance); }
+    .fiche-rendu p { margin: 0 0 0.5rem; }
+    .fiche-rendu p:last-child { margin-bottom: 0; }
+    .fiche-rendu h4, .fiche-rendu h5, .fiche-rendu h6 { margin: 0.6rem 0 0.3rem; font-size: 0.85rem; }
+    .fiche-rendu ul { margin: 0 0 0.5rem; padding-left: 1.1rem; }
+    .fiche-rendu code { padding: 0 0.2rem; border-radius: 0.2rem; background: var(--surbrillance); }
+    .fiche-vide { color: var(--muted); font-style: italic; }
+
+    .fiche-zone { resize: vertical; line-height: 1.5; }
+
+    .fiche-medias, .fiche-proprietes {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .medias-grille {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .media-carte {
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      overflow: hidden;
+    }
+
+    .media-apercu {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.5rem;
+      background: var(--surbrillance);
+    }
+
+    .media-apercu img, .media-apercu video { display: block; width: 100%; height: auto; }
+    .media-apercu audio { width: 100%; padding: 0.35rem; }
+    .media-absent { padding: 0.6rem; color: var(--muted); font-size: 0.72rem; }
+
+    .media-pied {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.4rem;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .media-pied span {
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .media-retirer {
+      width: 1.3rem;
+      height: 1.3rem;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      font-size: 0.95rem;
+      line-height: 1;
+      flex: none;
+    }
+
+    .medias-depot {
+      padding: 0.6rem;
+      border: 1px dashed var(--border);
+      border-radius: 0.5rem;
+      color: var(--muted);
+      font-size: 0.71rem;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .medias-depot:hover, .medias-depot.survol {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .propriete { display: flex; gap: 0.3rem; align-items: center; }
+    .propriete .champ { flex: 1 1 0; min-width: 0; }
+
+    .fiche-ajout {
+      align-self: flex-start;
+      padding: 0.25rem 0.55rem;
+      font-size: 0.72rem;
+    }
+
+    .fiche-actions { margin-top: auto; padding-top: 0.4rem; }
+
+    .title-group h1 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .title-group p {
+      margin: 0.2rem 0 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .group-title {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .session-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .session-tab {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.1rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.7rem;
+      text-align: left;
+      line-height: 1.25;
+    }
+
+    .session-tab span { font-size: 0.7rem; color: var(--muted); }
+
+    .session-tab[aria-pressed="true"] {
+      background: var(--button);
+      color: var(--button-text);
+      border-color: transparent;
+    }
+
+    .session-tab[aria-pressed="true"] span { color: inherit; opacity: 0.75; }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+
+    .button-row button { flex: 1 1 auto; }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .field-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .field input[type="range"] {
+      width: 100%;
+      accent-color: var(--button);
+    }
+
+    .swatches {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    .swatch {
+      width: 1.6rem;
+      height: 1.6rem;
+      padding: 0;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      cursor: pointer;
+    }
+
+    .swatch-custom {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red);
+    }
+
+    .swatch-custom input[type="color"] {
+      width: 2.2rem;
+      height: 2.2rem;
+      padding: 0;
+      border: none;
+      background: none;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .segmented {
+      display: flex;
+      gap: 0.3rem;
+    }
+
+    .segmented button { flex: 1 1 0; }
+
+    .segmented button[aria-pressed="true"] {
+      background: var(--button);
+      color: var(--button-text);
+      border-color: transparent;
+    }
+
+    /* -------------------------------------------------------- floating bits */
+
+    .hint {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      z-index: 3;
+      margin: 0;
+      padding: 0.5rem 0.8rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 0.76rem;
+      backdrop-filter: blur(12px);
+      pointer-events: none;
+      transition: opacity 250ms ease;
+    }
+
+    .viewer-status {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 3;
+      margin: 0;
+      padding: 0.4rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 0.76rem;
+      backdrop-filter: blur(12px);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 200ms ease;
+    }
+
+    .viewer-status.visible { opacity: 1; }
+
+    .ar-button {
+      position: fixed;
+      right: 1rem;
+      bottom: 3.6rem;
+      z-index: 3;
+      background: var(--button);
+      color: var(--button-text);
+      border-color: transparent;
+    }
+
+    @media (max-width: 640px) {
+      :root { --panel-width: 100%; --panneau-droit: 100%; }
+      .panel-toggle.panel-open { left: 1rem; }
+      .toggle-droite.panel-open { left: auto; right: 1rem; }
+      .hint { display: none; }
+      /* A full-width panel would sit on top of the rail anyway. */
+      body:has(.panneau-calques:not(.collapsed)) .barre-outils { display: none; }
+      .barre-outils { right: 0.75rem; }
+    }
+
+    /* ------------------------------------------------------------ tactile */
+
+    /* A fingertip covers about 9 mm; anything smaller than that is aimed at,
+       not hit. Everything that gets tapped grows, and nothing that only gets
+       read does — the panels are cramped enough as it is. */
+    @media (pointer: coarse) {
+      .outil { width: 2.9rem; height: 2.9rem; }
+      .outil svg { width: 1.45rem; height: 1.45rem; }
+      .barre-outils { gap: 0.35rem; padding: 0.35rem; }
+
+      button { padding: 0.6rem 0.9rem; }
+      .bouton-icone { width: 2.4rem; height: 2.4rem; }
+      .barre-calques button { padding: 0.6rem 0.5rem; }
+      .menu-option { padding: 0.6rem 0.6rem; }
+
+      .calque { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+      .calque-oeil { width: 1.7rem; height: 1.7rem; }
+      .calque-chevron { width: 1.4rem; font-size: 0.75rem; }
+
+      .swatch { width: 2.1rem; height: 2.1rem; }
+      .palette .swatch { width: 1.9rem; height: 1.9rem; }
+
+      /* The default range thumb is about 4 mm across. */
+      .field input[type="range"] { height: 2rem; }
+
+      .reglages-outil { width: 14rem; gap: 0.7rem; }
+
+      /* The drag handle for reordering layers: only shown where dragging a row
+         with a finger cannot work. */
+      .calque-poignee { display: flex; }
+    }
+  </style>
+  <link rel="stylesheet" href="./src/ui/interface.css">
+</head>
+<body class="app-shell">
+  <div id="scene"></div>
+  <div id="epingles" class="couche-epingles"></div>
+  <div id="mesures" class="couche-epingles couche-mesures"></div>
+
+  <div class="barre-outils" id="barreOutils" role="toolbar" aria-label="Outils d’annotation"></div>
+
+  <div class="reglages-outil" id="reglagesEpingle" hidden>
+    <span class="group-title">Annotation</span>
+    <p class="reglages-cible" id="epingleCible"></p>
+    <div class="field">
+      <span class="field-label"><label>Couleur du calque</label></span>
+      <div id="epinglePalette"></div>
+    </div>
+    <p class="reglages-note">Un clic sur le spécimen pose une annotation.</p>
+  </div>
+
+  <div class="reglages-outil" id="reglagesPinceau" hidden>
+    <span class="group-title">Pinceau</span>
+    <p class="reglages-cible" id="pinceauCible"></p>
+    <div class="field">
+      <span class="field-label">
+        <label for="pinceauTaille">Taille</label>
+        <span id="pinceauTailleValeur">20 mm</span>
+      </span>
+      <input type="range" id="pinceauTaille" min="1" max="80" step="1" value="20">
+    </div>
+    <div class="field">
+      <span class="field-label">
+        <label for="pinceauDurete">Dureté</label>
+        <span id="pinceauDureteValeur">0.55</span>
+      </span>
+      <input type="range" id="pinceauDurete" min="0" max="1" step="0.05" value="0.55">
+    </div>
+    <div class="field">
+      <span class="field-label"><label>Couleur du calque</label></span>
+      <div id="pinceauPalette"></div>
+    </div>
+  </div>
+
+  <div class="reglages-outil" id="reglagesGomme" hidden>
+    <span class="group-title">Gomme</span>
+    <p class="reglages-cible" id="gommeCible"></p>
+    <div class="field">
+      <span class="field-label">
+        <label for="gommeTaille">Taille</label>
+        <span id="gommeTailleValeur">24 mm</span>
+      </span>
+      <input type="range" id="gommeTaille" min="1" max="80" step="1" value="24">
+    </div>
+    <div class="field">
+      <span class="field-label">
+        <label for="gommeDurete">Dureté</label>
+        <span id="gommeDureteValeur">0.55</span>
+      </span>
+      <input type="range" id="gommeDurete" min="0" max="1" step="0.05" value="0.55">
+    </div>
+    <p class="reglages-note">Efface la peinture du calque ci-dessus. Le geste
+      reste annulable : rien n’est supprimé.</p>
+  </div>
+
+  <div class="reglages-outil" id="reglagesSelection" hidden>
+    <span class="group-title" id="selTitre">Sélection</span>
+    <p class="reglages-cible" id="selCible"></p>
+
+    <div class="field">
+      <span class="field-label"><label>Combinaison</label></span>
+      <div class="segmented modes" id="selModes">
+        <button type="button" data-mode="remplacer" aria-pressed="true" title="Remplacer la sélection">Nouv.</button>
+        <button type="button" data-mode="ajouter" aria-pressed="false" title="Ajouter (Maj)">+</button>
+        <button type="button" data-mode="retirer" aria-pressed="false" title="Soustraire (Alt)">−</button>
+        <button type="button" data-mode="intersecter" aria-pressed="false" title="Intersecter (Maj+Alt)">∩</button>
+      </div>
+    </div>
+
+    <div class="field" id="champAngle">
+      <span class="field-label">
+        <label for="selAngle">Angle limite</label>
+        <span id="selAngleValeur">32°</span>
+      </span>
+      <input type="range" id="selAngle" min="5" max="90" step="1" value="32">
+    </div>
+    <div class="field" id="champTolerance">
+      <span class="field-label">
+        <label for="selTolerance">Tolérance couleur</label>
+        <span id="selToleranceValeur">42</span>
+      </span>
+      <input type="range" id="selTolerance" min="0" max="255" step="1" value="42">
+    </div>
+
+    <p class="reglages-note" id="selEtat">Aucune sélection.</p>
+    <div class="barre-calques">
+      <button id="selElargir" type="button" title="Étendre d’un anneau de faces">+</button>
+      <button id="selRetrecir" type="button" title="Réduire d’un anneau de faces">−</button>
+      <button id="selLisser" type="button" title="Boucher les trous et lisser le bord">Lisser</button>
+      <button id="selVider" type="button" title="Tout désélectionner">Vider</button>
+    </div>
+    <button id="selCreerRegion" type="button" disabled>Créer la région</button>
+  </div>
+
+  <div class="reglages-outil" id="reglagesMesure" hidden>
+    <span class="group-title">Mesure</span>
+    <p class="reglages-cible" id="mesureCible"></p>
+
+    <div class="field">
+      <span class="field-label"><label>Trajet</label></span>
+      <div class="segmented modes" id="mesureModes">
+        <button type="button" data-mode="droite" aria-pressed="true"
+          title="Distance à vol d’oiseau, comme un pied à coulisse">Droite</button>
+        <button type="button" data-mode="surface" aria-pressed="false"
+          title="Plus court chemin en restant sur le maillage, comme un mètre ruban">Surface</button>
+      </div>
+    </div>
+
+    <p class="reglages-note" id="mesureEtat">Cliquez un premier point sur le spécimen.</p>
+
+    <div class="barre-calques">
+      <button id="mesureRetirer" type="button" title="Retirer le dernier point">Défaire</button>
+      <button id="mesureTerminer" type="button" title="Terminer la mesure (Entrée)">Terminer</button>
+    </div>
+
+    <div class="field">
+      <span class="field-label"><label>Couleur du calque</label></span>
+      <div id="mesurePalette"></div>
+    </div>
+
+    <div class="group releve" id="mesureSpecimen"></div>
+  </div>
+
+  <svg class="trace-lasso" id="traceLasso" hidden aria-hidden="true">
+    <polyline id="traceLassoLigne" />
+  </svg>
+
+  <p class="viewer-status" id="viewerStatus" role="status"></p>
+  <p class="hint" id="hint">Clic gauche : rotation · clic droit : déplacement · molette : zoom</p>
+
+  <button class="ar-button" id="arButton" type="button" hidden>Voir dans l’espace</button>
+
+  <button class="panel-toggle panel-open" id="panelToggle" type="button" aria-expanded="true" aria-controls="panel" title="Replier le panneau">
+    <span id="panelToggleIcon" aria-hidden="true">◀</span>
+    <span class="visually-hidden" id="panelToggleLabel">Replier le panneau</span>
+  </button>
+
+  <aside class="panel panneau-projet" id="panel" aria-label="Réglages de la scène">
+    <header class="project-header">
+      <div class="project-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32">
+          <path d="M5 16.2c4.7-6.1 11.6-8.2 19.8-5.7-2.6 1.3-4 3-4.2 5.3.2 2.2 1.6 4 4.2 5.3C16.6 23.7 9.7 21.8 5 16.2Z"/>
+          <path d="m8.2 13.1-3.9-3.3.9 5.9-.9 6.1 4-3.4"/>
+          <circle cx="19.4" cy="14.1" r="1"/>
+        </svg>
+      </div>
+      <div class="title-group">
+        <span class="panel-kicker">Atelier d’observation 3D</span>
+        <h1 id="projectTitle">Dactylopterus Volantis</h1>
+        <p id="projectSubtitle">Chargement…</p>
+      </div>
+    </header>
+
+    <div class="group panel-section" data-section="sessions">
+      <span class="group-title">Sessions</span>
+      <div class="session-list" id="sessionList"></div>
+    </div>
+
+    <div class="group panel-section" data-section="vue">
+      <span class="group-title">Vue</span>
+      <div class="button-row">
+        <button id="rotationButton" type="button" aria-pressed="false">Rotation auto</button>
+        <button id="resetButton" type="button">Recentrer</button>
+        <button id="fullscreenButton" type="button">Plein écran</button>
+      </div>
+    </div>
+
+    <div class="group panel-section" data-section="fond">
+      <span class="group-title">Fond</span>
+      <div class="swatches" id="bgSwatches">
+        <label class="swatch swatch-custom" for="bgCustom" title="Couleur personnalisée">
+          <input type="color" id="bgCustom" value="#ecebe7">
+        </label>
+      </div>
+    </div>
+
+    <div class="group panel-section" data-section="lumiere">
+      <span class="group-title">Lumière</span>
+
+      <div class="field">
+        <span class="field-label">
+          <label for="intensityRange">Intensité</label>
+          <span id="intensityValue">1.00</span>
+        </span>
+        <input type="range" id="intensityRange" min="0.4" max="2" step="0.02" value="1">
+      </div>
+
+      <div class="segmented" role="group" aria-label="Type d'éclairage">
+        <button id="lightFixedButton" type="button" aria-pressed="true">Fixe</button>
+        <button id="lightCursorButton" type="button" aria-pressed="false">Suit la souris</button>
+      </div>
+    </div>
+
+    <div class="group panel-section" data-section="apparence">
+      <span class="group-title">Apparence du modèle</span>
+      <div class="field">
+        <span class="field-label">
+          <label for="glossRange">Reflet</label>
+          <span id="glossValue">0.62</span>
+        </span>
+        <input type="range" id="glossRange" min="0" max="1" step="0.01" value="0.62">
+      </div>
+      <div class="field">
+        <span class="field-label">
+          <label for="modelOpacityRange">Opacité du modèle</label>
+          <span id="modelOpacityValue">100 %</span>
+        </span>
+        <input type="range" id="modelOpacityRange" min="0" max="1" step="0.01" value="1">
+      </div>
+    </div>
+  </aside>
+
+  <button class="panel-toggle toggle-droite panel-open" id="calquesToggle" type="button" aria-expanded="true" aria-controls="panneauCalques" title="Replier le panneau">
+    <span id="calquesToggleIcon" aria-hidden="true">▶</span>
+    <span class="visually-hidden" id="calquesToggleLabel">Replier le panneau</span>
+  </button>
+
+  <aside class="panel panneau-calques" id="panneauCalques" aria-label="Calques et propriétés">
+    <div class="panneau-entete">
+      <div class="panneau-titre">
+        <span class="panel-kicker">Annotations</span>
+        <h2>Calques</h2>
+      </div>
+      <div class="historique">
+        <button class="bouton-icone" id="annulerBouton" type="button" title="Annuler" aria-label="Annuler" disabled>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.2 6.1 3.7 9.5 7.2 13"/><path d="M4.1 9.5h7a5 5 0 0 1 5 5"/></svg>
+        </button>
+        <button class="bouton-icone" id="retablirBouton" type="button" title="Rétablir" aria-label="Rétablir" disabled>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12.8 6.1 3.5 3.4-3.5 3.5"/><path d="M15.9 9.5h-7a5 5 0 0 0-5 5"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="bandeau-brouillon" id="bandeauBrouillon" hidden></div>
+
+    <div class="barre-calques">
+      <div class="menu-ancre">
+        <button class="action-principale" id="nouveauCalque" type="button" aria-haspopup="true">+ Nouveau calque</button>
+        <div class="menu" id="menuTypes" role="menu"></div>
+      </div>
+      <button id="nouveauGroupe" type="button">Nouveau groupe</button>
+    </div>
+
+    <div class="barre-calques">
+      <button id="dupliquerCalque" type="button" disabled>Dupliquer</button>
+      <button id="fusionnerCalque" type="button" disabled title="Fusionner avec le calque du dessous">Fusionner</button>
+      <button class="action-dangereuse" id="supprimerCalque" type="button" disabled>Supprimer</button>
+    </div>
+
+    <div class="calques-liste" id="calquesListe"></div>
+
+    <div class="barre-inspecteur" id="barreInspecteur">
+      <span class="poignee-inspecteur" id="poigneeInspecteur" role="separator"
+        aria-label="Redimensionner les propriétés" aria-orientation="horizontal"
+        aria-controls="inspecteur" aria-valuemin="96" aria-valuenow="260"
+        tabindex="0" title="Glisser pour redimensionner · double-cliquer pour réinitialiser">
+        <span aria-hidden="true"></span>
+      </span>
+      <button class="inspecteur-bascule" id="inspecteurBascule" type="button"
+        aria-expanded="true" aria-controls="inspecteur">
+        <span class="inspecteur-chevron" aria-hidden="true"></span>
+        <span class="inspecteur-bascule-texte" id="inspecteurBasculeTexte">Propriétés</span>
+        <span class="inspecteur-bascule-aide">Replier</span>
+      </button>
+    </div>
+
+    <div class="inspecteur" id="inspecteur"></div>
+
+    <div class="panneau-pied">
+      <button id="exporterAnnotations" type="button" title="Télécharger les annotations">Exporter les annotations</button>
+    </div>
+
+    <div class="fiche" id="fiche" hidden></div>
+  </aside>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

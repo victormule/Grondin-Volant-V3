@@ -1,0 +1,10 @@
+# Normalise les fins de ligne dans le dépôt (LF), quel que soit le poste.
+* text=auto eol=lf
+
+# Binaires : ne jamais y toucher.
+*.glb   binary
+*.usdz  binary
+*.png   binary
+*.jpg   binary
+*.webp  binary
+*.ply   binary
