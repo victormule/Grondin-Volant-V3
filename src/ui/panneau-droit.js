@@ -4,10 +4,10 @@
 // which wraps it in an undo command and schedules the local draft save — so
 // there is no path by which a change escapes the undo stack or gets lost.
 
-import { creerCalque, TYPES_CALQUE } from '../document/modele.js';
+import { creerCalque, TYPES_CALQUE, DocumentAnnotation } from '../document/modele.js';
 import { commandeInstantane } from '../document/commandes.js';
 import { exporter, telecharger } from '../document/stockage.js';
-import { construireZip } from '../document/zip.js';
+import { construireZip, lireZip } from '../document/zip.js';
 import { ListeCalques } from './liste-calques.js';
 import { Inspecteur } from './inspecteur.js';
 import { Fiche } from './fiche.js';
@@ -208,7 +208,8 @@ export class PanneauDroit {
 
   _brancherActions() {
     const { nouveauCalque, nouveauGroupe, dupliquer, supprimer, fusionner,
-      annuler, retablir, exporter: boutonExport, menu } = this.elements;
+      annuler, retablir, exporter: boutonExport, importer: boutonImport,
+      fichierImport, menu } = this.elements;
 
     nouveauCalque.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -236,6 +237,17 @@ export class PanneauDroit {
     annuler.addEventListener('click', () => { this.pile.annuler(); this._apresHistorique(); });
     retablir.addEventListener('click', () => { this.pile.retablir(); this._apresHistorique(); });
     boutonExport.addEventListener('click', () => this._exporter());
+
+    if (boutonImport && fichierImport) {
+      boutonImport.addEventListener('click', () => fichierImport.click());
+      fichierImport.addEventListener('change', async () => {
+        const fichier = fichierImport.files?.[0];
+        // Cleared before awaiting, so choosing the same file twice in a row
+        // still fires a change event the second time.
+        fichierImport.value = '';
+        await this._importer(fichier);
+      });
+    }
   }
 
   // Without media, a plain annotations.json is what goes in the folder. With
@@ -249,9 +261,8 @@ export class PanneauDroit {
       return;
     }
 
-    const libelle = bouton.textContent;
     bouton.disabled = true;
-    bouton.textContent = 'Préparation…';
+    this._message(bouton, 'Préparation…', 0);
     try {
       const { fichiers, table } = await this.medias.pourExport(donnees.medias);
       for (const media of donnees.medias) {
@@ -262,12 +273,123 @@ export class PanneauDroit {
       telecharger(archive, 'annotations.zip');
     } catch (erreur) {
       console.error('Export impossible.', erreur);
-      bouton.textContent = 'Export impossible';
-      setTimeout(() => { bouton.textContent = libelle; bouton.disabled = false; }, 2500);
+      bouton.disabled = false;
+      this._message(bouton, 'Export impossible');
       return;
     }
-    bouton.textContent = libelle;
     bouton.disabled = false;
+    this._message(bouton);
+  }
+
+  /* ------------------------------------------------------ état des boutons */
+
+  // A passing message on a button, and its way back.
+  //
+  // The label is read from the DOM once and kept on the element; each new
+  // message cancels the previous one's timer. Both matter: restoring
+  // `textContent` as it was on entry meant that a second import, started before
+  // the first message had faded, captured « 3 calques importés » as the label
+  // to return to — and the button wore it for good.
+  _message(bouton, texte = null, duree = 2800) {
+    if (!bouton) return;
+    bouton.dataset.libelle ??= bouton.textContent;
+    this._minuteursBouton ??= new Map();
+    clearTimeout(this._minuteursBouton.get(bouton));
+    bouton.textContent = texte ?? bouton.dataset.libelle;
+    if (texte === null || duree <= 0) return;
+    this._minuteursBouton.set(bouton,
+      setTimeout(() => { bouton.textContent = bouton.dataset.libelle; }, duree));
+  }
+
+  /* -------------------------------------------------------------- import */
+
+  // The counterpart of the export, and the only way a document gets from one
+  // browser to another: there is no server, so a file is the whole transport.
+  //
+  // Both shapes the export produces are accepted — a bare annotations.json, or
+  // the archive that carries the media alongside it — and they are told apart
+  // by content rather than by extension, because a file that has been through a
+  // mail client often arrives renamed.
+  async _importer(fichier) {
+    if (!fichier) return;
+    const bouton = this.elements.importer;
+    const echouer = (message) => {
+      console.error('Import impossible.', message);
+      if (bouton) bouton.disabled = false;
+      this._message(bouton, 'Fichier illisible');
+      return false;
+    };
+
+    if (bouton) bouton.disabled = true;
+    this._message(bouton, 'Lecture…', 0);
+
+    let donnees = null;
+    let fichiers = null;
+    try {
+      const tampon = await fichier.arrayBuffer();
+      const entete = new Uint8Array(tampon, 0, Math.min(4, tampon.byteLength));
+      const estZip = entete[0] === 0x50 && entete[1] === 0x4B;
+
+      if (estZip) {
+        fichiers = await lireZip(tampon);
+        const json = fichiers.get('annotations.json')
+          ?? [...fichiers.entries()].find(([nom]) => nom.endsWith('annotations.json'))?.[1];
+        if (!json) throw new Error('L’archive ne contient pas annotations.json.');
+        donnees = JSON.parse(new TextDecoder().decode(json));
+      } else {
+        donnees = JSON.parse(new TextDecoder().decode(tampon));
+      }
+    } catch (erreur) {
+      return echouer(erreur.message);
+    }
+
+    if (!donnees?.racine || !Array.isArray(donnees.racine.enfants)) {
+      return echouer('Ce fichier ne contient pas de document d’annotation.');
+    }
+    donnees.medias = Array.isArray(donnees.medias) ? donnees.medias : [];
+
+    // Replacing the layer stack throws away whatever is on screen, and the undo
+    // stack cannot walk back across a document swap. Asking is the only honest
+    // thing to do — and only when there is actually something to lose.
+    const aDuTravail = this.doc.racine.enfants.length > 0;
+    if (aDuTravail && !window.confirm(
+      'Importer ce profil remplacera les calques actuels. '
+      + 'Cette action ne pourra pas être annulée. Continuer ?')) {
+      if (bouton) bouton.disabled = false;
+      this._message(bouton);
+      return false;
+    }
+
+    // Media travel as files inside the archive; they are moved into this
+    // browser's store so the cards find them, exactly as if they had been
+    // dropped in by hand.
+    let manquants = 0;
+    if (fichiers && this.medias) {
+      for (const media of donnees.medias) {
+        const octets = media.chemin ? fichiers.get(media.chemin) : null;
+        if (!octets) { manquants += 1; continue; }
+        try {
+          await this.medias.adopter(media, new Blob([octets], { type: media.type || '' }));
+        } catch (erreur) {
+          console.warn(`Média non repris : ${media.nom}`, erreur);
+          manquants += 1;
+        }
+      }
+    }
+
+    this.definirDocument(DocumentAnnotation.deserialiser(donnees));
+    this.pile.vider();
+    this.liste.selection = null;
+    this.inspecteur.afficher(null);
+    this.rafraichir();
+    this.sauvegarde?.planifier(this.doc.serialiser());
+
+    if (bouton) bouton.disabled = false;
+    const calques = this.doc.aplatir().length;
+    this._message(bouton, manquants > 0
+      ? `${calques} calques · ${manquants} média(s) manquant(s)`
+      : `${calques} calque${calques > 1 ? 's' : ''} importé${calques > 1 ? 's' : ''}`, 3200);
+    return true;
   }
 
   _basculerMenu() {

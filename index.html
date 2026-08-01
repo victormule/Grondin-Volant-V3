@@ -1411,6 +1411,11 @@
 
     <div class="panneau-pied">
       <button id="exporterAnnotations" type="button" title="Télécharger les annotations">Exporter les annotations</button>
+      <button id="importerAnnotations" type="button"
+        title="Charger un profil d’annotation (.json ou .zip) — remplace les calques actuels">Importer un profil</button>
+      <!-- Le champ reste hors flux : c'est le bouton au-dessus qui l'ouvre. -->
+      <input id="fichierImport" type="file" hidden
+        accept=".json,.zip,application/json,application/zip">
     </div>
 
     <div class="fiche" id="fiche" hidden></div>

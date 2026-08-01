@@ -966,11 +966,21 @@ select.champ {
 }
 
 .panneau-pied {
+  display: flex;
+  flex-direction: column;
+  gap: 0.32rem;
   padding-top: 0.05rem;
 }
 
 .panneau-pied button {
   min-height: 2.2rem;
+}
+
+/* L'import est la porte d'entrée, l'export la porte de sortie : même poids
+   visuel serait trompeur, puisque l'import écrase le travail en cours. */
+#importerAnnotations {
+  font-size: 0.72rem;
+  min-height: 1.9rem;
 }
 
 /* --------------------------------------------------------- outils flottants */

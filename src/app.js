@@ -78,6 +78,8 @@ const elementsCalques = {
   annuler: $('#annulerBouton'),
   retablir: $('#retablirBouton'),
   exporter: $('#exporterAnnotations'),
+  importer: $('#importerAnnotations'),
+  fichierImport: $('#fichierImport'),
 };
 
 const scene3d = new Scene3D(elements.scene, config);

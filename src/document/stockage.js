@@ -85,13 +85,23 @@ export async function chargerPublie() {
   }
 }
 
+// The link is put in the document and the URL is released on the next turn of
+// the event loop, not on the line after the click. Revoking straight away is a
+// race the browser loses on a large archive: it has the click but no longer has
+// anything to read, and the download arrives empty or not at all.
 export function telecharger(blob, nomFichier) {
   const url = URL.createObjectURL(blob);
   const lien = document.createElement('a');
   lien.href = url;
   lien.download = nomFichier;
+  lien.rel = 'noopener';
+  lien.style.display = 'none';
+  document.body.appendChild(lien);
   lien.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    lien.remove();
+    URL.revokeObjectURL(url);
+  }, 30_000);
 }
 
 export function exporter(donnees, nomFichier = 'annotations.json') {

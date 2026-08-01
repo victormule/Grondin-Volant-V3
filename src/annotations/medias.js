@@ -88,6 +88,23 @@ export class BibliothequeMedias {
     return media;
   }
 
+  // Takes in a file that arrived inside an imported archive. The bytes go to
+  // IndexedDB under the id the document already refers to, and `chemin` is
+  // cleared: the media now lives in this browser, not at a path on a server
+  // that has never heard of it. Without that reset an imported card would look
+  // for ./annotations/medias/… and show a hole.
+  async adopter(media, blob) {
+    const db = await ouvrir();
+    await transaction(db, 'readwrite',
+      (magasin) => magasin.put({ id: media.id, blob }), MAGASIN_MEDIAS);
+    db.close();
+    this.oublier(media.id);
+    this.urls.set(media.id, URL.createObjectURL(blob));
+    media.chemin = null;
+    media.taille = blob.size;
+    return media;
+  }
+
   async blob(media) {
     if (media.chemin) {
       const reponse = await fetch(`./annotations/${media.chemin}`);
