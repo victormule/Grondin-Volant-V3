@@ -218,6 +218,10 @@ export class Scene3D {
     const controleChange = this.controls.update(delta);
     if (!this._renduDemande && !controleChange) return;
     this._renduDemande = false;
+    // Anything expressed relative to the camera — the directed key light — has
+    // to be rebuilt here, once the controls have settled and before the frame
+    // is drawn, or it trails the view by one image.
+    this.avantRendu?.();
     this.renderer.clear();
     if (this.mode === 'composite') this._rendreComposite();
     else this.renderer.render(this.scene, this.camera);

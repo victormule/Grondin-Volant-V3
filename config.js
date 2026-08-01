@@ -13,23 +13,47 @@ window.VIEWER_CONFIG = {
     intensityMin: 0.4,
     intensityMax: 2,
 
-    // "fixe"   : éclairage d'origine, identique quel que soit le point de vue.
-    // "souris" : la lumière suit le curseur de la souris.
+    // "fixe"    : éclairage d'origine, identique quel que soit le point de vue.
+    // "dirigee" : une source que vous orientez vous-même et qui reste où vous
+    //             la posez, par-dessus l'éclairage d'origine atténué.
     mode: 'fixe',
 
-    // Réglages utilisés uniquement en mode "souris".
-    souris: {
-      // Luminosité du fond d'environnement (0 = noir, 1 = blanc).
-      // Plus la valeur est basse, plus la direction de la lumière est marquée,
-      // mais plus l'ensemble est sombre.
-      ambiance: 0.62,
+    // Réglages utilisés uniquement en mode "dirigee".
+    //
+    // POURQUOI UNE SOURCE ET NON UN ENVIRONNEMENT — un environnement filtré est
+    // diffus par construction : c'est la moyenne de tout ce qui entoure le
+    // spécimen. La lumière rasante est exactement l'inverse, une source presque
+    // parallèle à la surface dont tout l'intérêt est de n'être PAS moyennée.
+    // C'est elle qui fait ressortir les écailles et les rayons des nageoires,
+    // en s'appuyant sur la carte de normales que portent les captures.
+    dirigee: {
+      // Ce qui reste de l'éclairage d'origine, en fond (0 = noir, 1 = normal).
+      // C'est le réglage du CONTRASTE : plus il est bas, plus le relief
+      // ressort, mais plus les ombres se ferment. Autour de 0.3 pour une image
+      // rasante lisible, 0.6 et plus pour un rendu documentaire neutre.
+      ambiance: 0.32,
 
-      // Force de la source lumineuse principale (0 à 1).
-      intensiteSource: 1,
+      // Force de la source orientable, de 0 à 30. Elle se lit avec le curseur
+      // « Reflet » : une surface peu rugueuse renvoie un éclat net et petit,
+      // une surface mate étale la lumière.
+      //
+      // La plage monte haut volontairement. Plus la lumière est rasante, moins
+      // elle atteint les surfaces tournées vers la caméra — c'est justement ce
+      // qui fait ressortir le relief, mais l'image s'assombrit d'autant. Il
+      // faut alors monter la force, exactement comme on ouvre le diaphragme.
+      // Autour de 4 pour un éclairage oblique, 15 à 30 pour un vrai rasant.
+      intensite: 4,
 
-      // Taille de la source : petite = ombres franches, grande = lumière douce.
-      // Exprimée en fraction de la largeur de l'environnement (0.05 à 0.5).
-      tailleSource: 0.22,
+      // Position de départ du point sur le disque, de -1 à 1 chacun. Le centre
+      // éclaire de face (aucun relief), le bord éclaire à 90° (rasant).
+      x: -0.55,
+      y: 0.5,
+
+      // Angle atteint au bord du disque, en degrés depuis l'axe de la caméra.
+      // 90 = exactement rasant. Au-delà la lumière passe derrière le spécimen
+      // et souligne les membranes translucides des nageoires ; l'anneau tracé
+      // sur le disque marque toujours le rasant.
+      angleMax: 110,
     },
   },
 

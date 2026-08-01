@@ -27,6 +27,7 @@ import { Metrologie, formaterAire, formaterLongueur, formaterVolume }
   from './mesure/metriques.js';
 import { Atelier } from './ui/atelier.js';
 import { creerPalette } from './ui/palette.js';
+import { creerDisqueLumiere } from './ui/disque-lumiere.js';
 
 const $ = (selecteur) => document.querySelector(selecteur);
 
@@ -53,6 +54,12 @@ const elements = {
   opaciteModeleValeur: $('#modelOpacityValue'),
   lumiereFixe: $('#lightFixedButton'),
   lumiereSouris: $('#lightCursorButton'),
+  reglagesLumiere: $('#reglagesLumiere'),
+  disqueLumiere: $('#disqueLumiere'),
+  lumiereForce: $('#lightKeyRange'),
+  lumiereForceValeur: $('#lightKeyValue'),
+  lumiereAmbiance: $('#lightFillRange'),
+  lumiereAmbianceValeur: $('#lightFillValue'),
   ar: $('#arButton'),
 };
 
@@ -83,9 +90,13 @@ const elementsCalques = {
 };
 
 const scene3d = new Scene3D(elements.scene, config);
-const eclairage = new Eclairage(scene3d.renderer, scene3d.scene, config);
+const eclairage = new Eclairage(scene3d.renderer, scene3d.scene, config, scene3d.camera);
 const ombre = new OmbreContact(scene3d.renderer, scene3d.scene, config);
 eclairage.surChangement = () => scene3d.demanderRendu();
+// The key light is aimed relative to the camera, so it is re-aimed on every
+// frame the view actually changes — which costs three vector operations, not a
+// rebuilt environment map.
+scene3d.avantRendu = () => eclairage.orienter();
 ombre.surChangement = () => scene3d.demanderRendu();
 const definirSourcesAR = configurerAR(elements.ar, document.title);
 
@@ -173,15 +184,43 @@ function appliquerIntensite() {
 elements.intensite.addEventListener('input', appliquerIntensite);
 appliquerIntensite();
 
+// The disc is the whole control: a dot you drag, that stays where you drop it.
+const disqueLumiere = creerDisqueLumiere({
+  x: eclairage.x,
+  y: eclairage.y,
+  angleMax: eclairage.angleMax,
+  surChangement: (x, y) => eclairage.definirDirection(x, y),
+});
+elements.disqueLumiere.appendChild(disqueLumiere.element);
+
 function definirModeLumiere(mode) {
   eclairage.setMode(mode);
-  elements.lumiereFixe.setAttribute('aria-pressed', String(eclairage.mode === 'fixe'));
-  elements.lumiereSouris.setAttribute('aria-pressed', String(eclairage.mode === 'souris'));
+  const dirige = eclairage.mode === 'dirigee';
+  elements.lumiereFixe.setAttribute('aria-pressed', String(!dirige));
+  elements.lumiereSouris.setAttribute('aria-pressed', String(dirige));
+  elements.reglagesLumiere.hidden = !dirige;
 }
 
 elements.lumiereFixe.addEventListener('click', () => definirModeLumiere('fixe'));
-elements.lumiereSouris.addEventListener('click', () => definirModeLumiere('souris'));
-definirModeLumiere(config.light.mode);
+elements.lumiereSouris.addEventListener('click', () => definirModeLumiere('dirigee'));
+
+elements.lumiereForce.value = eclairage.cle.intensity;
+elements.lumiereForceValeur.textContent = Number(eclairage.cle.intensity).toFixed(2);
+elements.lumiereForce.addEventListener('input', () => {
+  const valeur = Number(elements.lumiereForce.value);
+  elements.lumiereForceValeur.textContent = valeur.toFixed(2);
+  eclairage.definirIntensite(valeur);
+});
+
+elements.lumiereAmbiance.value = eclairage.ambiance;
+elements.lumiereAmbianceValeur.textContent = `${Math.round(eclairage.ambiance * 100)} %`;
+elements.lumiereAmbiance.addEventListener('input', () => {
+  const valeur = Number(elements.lumiereAmbiance.value);
+  elements.lumiereAmbianceValeur.textContent = `${Math.round(valeur * 100)} %`;
+  eclairage.definirAmbiance(valeur);
+});
+
+definirModeLumiere(config.light.mode === 'souris' ? 'dirigee' : config.light.mode);
 
 ombre.intensite = config.ombre.intensite;
 
@@ -1181,6 +1220,9 @@ async function obtenirCouche(session, index) {
     if (!cadre) {
       scene3d.cadrer(boite);
       ombre.ajuster(boite);
+      // The key light stands off by the specimen's own radius, so a capture at
+      // any scale is lit the same way.
+      eclairage.cadrer(boite);
       cadre = true;
     }
 
