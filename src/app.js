@@ -130,6 +130,11 @@ scene3d.controls.addEventListener('start', () => {
   elements.indice.style.opacity = '0';
 });
 
+// The specimen's own vertical, before anything is framed: `cadrer` builds the
+// opening view from it, and it runs on the first capture to arrive.
+scene3d.definirAplomb(config.affichage.aplomb);
+scene3d.definirAxeRotation(config.affichage.axeRotation);
+
 elements.rotation.addEventListener('click', () => {
   scene3d.rotationAuto = !scene3d.rotationAuto;
   elements.rotation.setAttribute('aria-pressed', String(scene3d.rotationAuto));

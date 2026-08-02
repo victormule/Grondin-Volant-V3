@@ -17,6 +17,12 @@ const TONEMAPPINGS = {
 // divides by 6.
 const DEG_PAR_SECONDE = 6;
 
+// Scratch objects for the turntable, so a rotation costs no allocation per
+// frame.
+const _quaternion = new THREE.Quaternion();
+const _decalage = new THREE.Vector3();
+const _hautMonde = new THREE.Vector3(0, 1, 0);
+
 // Draws one captured layer over the canvas. Deliberately a bare pass-through:
 // the pixels come straight out of the canvas, already tone mapped and already
 // in display space, so any conversion three would normally add on the way in
@@ -160,6 +166,12 @@ export class Scene3D {
     const direction = new THREE.Vector3().setFromSpherical(
       new THREE.Spherical(1, THREE.MathUtils.degToRad(75), 0),
     );
+    // The 75° is measured from up, so it has to be tilted into the specimen's
+    // own up — otherwise the opening view is the only one in the application
+    // that is still framed on the capture's accidental horizon.
+    if (this.aplomb) {
+      direction.applyQuaternion(_quaternion.setFromUnitVectors(_hautMonde, this.aplomb));
+    }
     const distance = distanceDeCadrage(boite, cible, direction, this.camera)
       * this.config.camera.marge;
 
@@ -178,13 +190,82 @@ export class Scene3D {
     this.demanderRendu();
   }
 
+  // Which way is up for THIS specimen: the normal of its own base plate.
+  //
+  // The captures were made on a phone held in the hand, so the frame they came
+  // back in is level to nothing in particular — the little rectangular plinth
+  // sits about 2,3° off horizontal, and the whole mount reads as tilted from
+  // every viewpoint. The fix is not to rewrite the meshes: the pins, the paint
+  // dabs and the measurement points are all stored as coordinates in that same
+  // frame, and turning the geometry under them would tear every annotation off
+  // the specimen — and silently misplace any draft already saved in a browser.
+  //
+  // Nothing moves. What changes is which direction the camera calls up, so
+  // orbiting sweeps around the plinth's own vertical instead of the capture's.
+  // The specimen sits level, the fish keeps the slight forward lean it really
+  // has, and all three captures inherit it at once because they share one frame.
+  definirAplomb(normale) {
+    const haut = normale ? new THREE.Vector3(...normale) : null;
+    if (!haut || haut.lengthSq() < 1e-12) {
+      this.aplomb = null;
+      this.camera.up.copy(_hautMonde);
+    } else {
+      this.aplomb = haut.normalize();
+      this.camera.up.copy(this.aplomb);
+    }
+    this.demanderRendu();
+  }
+
+  // The axis the turntable spins about: a point it passes through, and a
+  // direction. Null falls back to OrbitControls' own auto-rotation, which is
+  // world-Y through the target.
+  definirAxeRotation(axe) {
+    if (!axe?.point || !axe?.direction) { this.axeRotation = null; return; }
+    const direction = new THREE.Vector3(...axe.direction);
+    if (direction.lengthSq() < 1e-12) { this.axeRotation = null; return; }
+    this.axeRotation = {
+      point: new THREE.Vector3(...axe.point),
+      direction: direction.normalize(),
+    };
+  }
+
+  // Turning about the mounting rod rather than about the middle of the scene.
+  //
+  // OrbitControls can only spin about world Y through its target, and neither
+  // half of that is what this specimen needs. The target is the centre of the
+  // bounding box — which here is the middle of the DRAPED TABLE, the fish
+  // being a small thing perched above and to one side — so the specimen swung
+  // around a distant axis like a fairground ride instead of turning on itself.
+  // And the rod leans 2,3° off vertical, so even a target moved onto it would
+  // still have left the fish wobbling once per revolution.
+  //
+  // What rotates is the camera, never the model: the pins, the paint atlas and
+  // the measurements are all anchored in world space, and turning the meshes
+  // under them would tear every annotation off the specimen. Rotating the eye
+  // and its target together about the rod is the same picture, and costs
+  // nothing.
   set rotationAuto(actif) {
-    this.controls.autoRotate = actif;
+    this._rotationAuto = Boolean(actif);
+    // Only hand the job back to OrbitControls when no axis was measured.
+    this.controls.autoRotate = this._rotationAuto && !this.axeRotation;
     this.demanderRendu();
   }
 
   get rotationAuto() {
-    return this.controls.autoRotate;
+    return this._rotationAuto ?? false;
+  }
+
+  _tournerAutourDeLAxe(delta) {
+    if (!this._rotationAuto || !this.axeRotation || delta <= 0) return false;
+    const angle = THREE.MathUtils.degToRad(this.config.affichage.vitesseRotation) * delta;
+    const { point, direction } = this.axeRotation;
+
+    _quaternion.setFromAxisAngle(direction, angle);
+    for (const vecteur of [this.camera.position, this.controls.target]) {
+      _decalage.subVectors(vecteur, point).applyQuaternion(_quaternion);
+      vecteur.copy(point).add(_decalage);
+    }
+    return true;
   }
 
   set exposition(valeur) {
@@ -215,7 +296,11 @@ export class Scene3D {
     // Capped so a backgrounded tab does not come back with a huge jump.
     const delta = Math.min((maintenant - this._dernierTemps) / 1000, 0.1);
     this._dernierTemps = maintenant;
-    const controleChange = this.controls.update(delta);
+    // Before the controls settle: they read the camera and the target, so the
+    // turn has to be in place by the time they do, or damping spends the frame
+    // undoing it.
+    const tourne = this._tournerAutourDeLAxe(delta);
+    const controleChange = this.controls.update(delta) || tourne;
     if (!this._renduDemande && !controleChange) return;
     this._renduDemande = false;
     // Anything expressed relative to the camera — the directed key light — has
