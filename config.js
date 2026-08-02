@@ -196,6 +196,29 @@ window.VIEWER_CONFIG = {
     // laquelle du vrai bord est perdu aussi — d'où la sous-estimation.
     // À ne passer à false que pour comparer.
     eviterCoutures: true,
+
+    // INCERTITUDE DE REPLI sur une aire de peinture, en relatif (0,001 = 0,1 %).
+    // Un nombre sans incertitude n'est pas une mesure : toutes les aires sont
+    // affichées sous la forme « 12,43 ± 0,01 cm² ».
+    //
+    // Sur une RÉGION la valeur n'est pas prise ici : elle est mesurée en direct.
+    // Une région est le seul calque que les deux méthodes savent mesurer — somme
+    // exacte sur les triangles d'un côté, intégration de la couverture dans
+    // l'atlas de l'autre — et l'écart entre les deux EST l'incertitude, sans
+    // avoir rien à supposer. Cette valeur mesurée est ensuite réutilisée pour
+    // les calques de peinture du même document, qui n'ont pas de contrepartie
+    // exacte.
+    //
+    // Le chiffre ci-dessous ne sert donc que tant qu'aucune région n'a encore
+    // été mesurée. Il vient du tableau de calibration plus haut, à 1024.
+    incertitudeAire: 0.001,
+
+    // RECALAGE DES CAPTURES — fichier produit à l'alignement, qui contient le
+    // résidu (RMSE) de chaque session sur la session de référence. C'est
+    // l'incertitude de position d'une annotation vue sur une autre capture que
+    // celle où elle a été posée ; elle est affichée telle quelle plutôt que
+    // passée sous silence.
+    recalage: './sessions/_alignment_transforms.json',
   },
 
   // ------------------------------------------------------------- SÉLECTION
@@ -224,8 +247,11 @@ window.VIEWER_CONFIG = {
     // maillage, et non une distance fixe.
     //
     // C'est important : sur ce spécimen une arête mesure environ 2 cm, donc un
-    // seuil choisi d'après le résidu de recalage (5 mm) serait plus petit
-    // qu'un seul triangle et ne retrouverait presque rien. Le facteur s'adapte
+    // seuil choisi d'après le résidu de recalage serait plus petit
+    // qu'un seul triangle et ne retrouverait presque rien. (Ce résidu vaut
+    // 0,0055 dans les unités du modèle, soit environ 1,8 mm réels une fois
+    // l'échelle appliquée — et non 5 mm : c'est la valeur brute qui était lue
+    // comme si une unité du modèle valait un mètre.) Le facteur s'adapte
     // tout seul si vous ajoutez une capture plus fine.
     // 0.6 = un peu plus d'une demi-face. Montez si la région se troue sur les
     // autres sessions, baissez si elle déborde.

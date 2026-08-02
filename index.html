@@ -688,6 +688,22 @@
       background: var(--couleur, var(--accent));
     }
 
+    /* How firmly the statement is made, on the specimen itself. A full dot is
+       a certainty; a hollow one is probable; a hollow dashed one is a
+       hypothesis. This is the cheapest guard against a reader taking
+       « probable » for « measured » — the mistake a condition report exists to
+       prevent, and one that no amount of text further down can undo. */
+    .epingle-point[data-confiance="probable"],
+    .epingle-point[data-confiance="hypothetique"] {
+      background: var(--panel);
+      border-width: 2px;
+      border-color: var(--couleur, var(--accent));
+    }
+
+    .epingle-point[data-confiance="hypothetique"] { border-style: dashed; }
+
+    .epingle-etiquette[data-confiance="hypothetique"] { border-style: dashed; }
+
     .epingle-etiquette {
       position: absolute;
       top: 0;
@@ -906,6 +922,9 @@
 
     .propriete { display: flex; gap: 0.3rem; align-items: center; }
     .propriete .champ { flex: 1 1 0; min-width: 0; }
+    /* The unit is a short field on purpose: « mm », « g », « % ». Giving it the
+       same width as the value invites a second value to be typed into it. */
+    .propriete .propriete-unite { flex: 0 0 3.4rem; }
 
     .fiche-ajout {
       align-self: flex-start;
@@ -914,6 +933,118 @@
     }
 
     .fiche-actions { margin-top: auto; padding-top: 0.4rem; }
+
+    /* ------------------------------------------- nature, confiance, examen */
+
+    .fiche-qualification, .fiche-conditions, .fiche-vue {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .fiche-natures {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+
+    .fiche-nature {
+      padding: 0.22rem 0.5rem;
+      font-size: 0.7rem;
+      border-radius: 999px;
+    }
+
+    .fiche-nature[aria-pressed="true"] {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .fiche-champ-ligne {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .fiche-champ-ligne > span {
+      flex: 0 0 4.4rem;
+      color: var(--muted);
+      font-size: 0.7rem;
+    }
+
+    .fiche-champ-ligne .champ, .fiche-champ-ligne select { flex: 1 1 0; min-width: 0; }
+
+    .fiche-vue-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .fiche-signature {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.66rem;
+      font-style: italic;
+    }
+
+    /* A described layer, summarised in the inspector. */
+    .inspecteur-fiche { display: flex; flex-direction: column; gap: 0.4rem; }
+
+    .fiche-marque { display: flex; align-items: center; gap: 0.3rem; }
+
+    .fiche-etiquette-nature, .fiche-etiquette-confiance {
+      padding: 0.12rem 0.42rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .fiche-etiquette-nature[data-nature="constat"] { border-color: color-mix(in srgb, #4f9066 55%, var(--border)); color: #4f9066; }
+    .fiche-etiquette-nature[data-nature="interpretation"] { border-color: color-mix(in srgb, #3d7ab8 55%, var(--border)); color: #3d7ab8; }
+    .fiche-etiquette-nature[data-nature="hypothese"] { border-color: color-mix(in srgb, #8360b8 55%, var(--border)); color: #8360b8; }
+    .fiche-etiquette-nature[data-nature="preconisation"] { border-color: color-mix(in srgb, #d99a35 55%, var(--border)); color: #d99a35; }
+    .fiche-etiquette-nature[data-nature="intervention"] { border-color: color-mix(in srgb, #c9553d 55%, var(--border)); color: #c9553d; }
+
+    .fiche-etiquette-confiance { color: var(--muted); }
+    .fiche-apercu { margin: 0; }
+
+    /* The marker on a layer row: which layers are entities, read without
+       opening any of them. */
+    .calque-fiche {
+      display: grid;
+      width: 1.15rem;
+      height: 1.15rem;
+      place-items: center;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      color: var(--muted);
+      font-size: 0.55rem;
+      font-weight: 800;
+      flex: none;
+    }
+
+    .calque-fiche[data-nature="constat"] { border-color: #4f9066; color: #4f9066; }
+    .calque-fiche[data-nature="interpretation"] { border-color: #3d7ab8; color: #3d7ab8; }
+    .calque-fiche[data-nature="hypothese"] { border-color: #8360b8; color: #8360b8; }
+    .calque-fiche[data-nature="preconisation"] { border-color: #d99a35; color: #d99a35; }
+    .calque-fiche[data-nature="intervention"] { border-color: #c9553d; color: #c9553d; }
+    .calque-fiche[data-confiance="hypothetique"] { border-style: dashed; }
+
+    /* Comparison across captures. The capture on screen is marked, the ones a
+       layer could not be transferred to are dimmed rather than hidden: a blank
+       is information. */
+    .comparaison-courante strong { color: var(--accent); }
+    .comparaison-absente { opacity: 0.55; }
+    .comparaison-absente strong { font-style: italic; font-weight: 500; }
+
+    .comparaison-dispersion {
+      margin-top: 0.15rem;
+      padding-top: 0.28rem;
+      border-top: 1px solid var(--border);
+    }
 
     .title-group h1 {
       margin: 0;

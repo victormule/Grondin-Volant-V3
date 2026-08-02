@@ -159,17 +159,26 @@ export class CoucheEpingles {
     ligne.style.opacity = String(opacite);
     this.liaisons.appendChild(ligne);
 
+    // The dot carries how firmly the statement is made. A solid ring is a
+    // certainty, a dashed one a hypothesis — read at a glance, on the specimen,
+    // without opening anything. It is the cheapest way to stop a reader taking
+    // « probable » for « measured ».
+    const confiance = epingle.confiance ?? 'certain';
     const point = document.createElement('button');
     point.type = 'button';
     point.className = 'epingle-point';
+    point.dataset.confiance = confiance;
+    point.dataset.nature = epingle.nature ?? 'constat';
     point.style.setProperty('--couleur', couleur);
     point.style.opacity = String(opacite);
-    point.title = epingle.titre || 'Annotation sans titre';
-    point.setAttribute('aria-label', `Ouvrir : ${epingle.titre || 'annotation sans titre'}`);
+    const qualite = confiance === 'certain' ? '' : ` (${confiance})`;
+    point.title = `${epingle.titre || 'Annotation sans titre'}${qualite}`;
+    point.setAttribute('aria-label', `Ouvrir : ${epingle.titre || 'annotation sans titre'}${qualite}`);
 
     const etiquette = document.createElement('button');
     etiquette.type = 'button';
     etiquette.className = 'epingle-etiquette';
+    etiquette.dataset.confiance = confiance;
     etiquette.style.setProperty('--couleur', couleur);
     etiquette.style.setProperty('--texte-etiquette', couleurTexte(couleur));
     etiquette.style.opacity = String(opacite);

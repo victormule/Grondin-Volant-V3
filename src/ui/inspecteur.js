@@ -1,12 +1,12 @@
 // Properties of the selected layer, at the foot of the right-hand panel.
 
-import { TYPES_CALQUE } from '../document/modele.js';
+import { TYPES_CALQUE, NATURES, CONFIANCES, ficheRenseignee } from '../document/modele.js';
 import { creerPalette } from './palette.js';
 
 export class Inspecteur {
   constructor(conteneur, {
     document: doc, surMutation, surApercu, sessions, couleurs, mesures, surConversionRegion,
-    surLissageRegion,
+    surLissageRegion, surOuvrirFiche, comparaison,
   }) {
     this.conteneur = conteneur;
     this.doc = doc;
@@ -17,8 +17,12 @@ export class Inspecteur {
     // Set by the application: what this layer measures, already formatted.
     // The inspector deliberately knows nothing about how it was obtained.
     this.mesures = mesures || null;
+    // Same contract for the per-capture comparison: already computed, already
+    // formatted, caveats included.
+    this.comparaison = comparaison || null;
     this.surConversionRegion = surConversionRegion || null;
     this.surLissageRegion = surLissageRegion || null;
+    this.surOuvrirFiche = surOuvrirFiche || null;
     this.sessionActive = null;
     this.id = null;
   }
@@ -87,8 +91,13 @@ export class Inspecteur {
       this.surMutation('Couleur', () => { calque.couleur = valeur; });
     }));
 
+    this.conteneur.appendChild(this._fiche(calque));
+
     const releve = this.mesures?.(calque);
     if (releve) this.conteneur.appendChild(this._releve(releve));
+
+    const comparaison = this.comparaison?.(calque);
+    if (comparaison) this.conteneur.appendChild(this._comparaison(comparaison));
 
     if (calque.type === 'peinture' && (calque.donnees?.elements.length ?? 0) > 0
       && !this.doc.verrouilleEffectivement(calque.id)) {
@@ -185,6 +194,129 @@ export class Inspecteur {
       chiffre.textContent = valeur;
       if (aide) ligne.title = aide;
       ligne.append(nom, chiffre);
+      bloc.appendChild(ligne);
+    }
+
+    if (note) {
+      const texte = document.createElement('p');
+      texte.className = 'reglages-note';
+      texte.textContent = note;
+      bloc.appendChild(texte);
+    }
+    return bloc;
+  }
+
+  // The layer's own card, or the offer to open one.
+  //
+  // Deliberately above the measurements: what the layer *is* comes before how
+  // much of it there is. A group with a card is an observed entity — the fin,
+  // this varnish loss — and the paint and pins under it are its facets rather
+  // than its namesakes.
+  _fiche(calque) {
+    const bloc = document.createElement('div');
+    bloc.className = 'group inspecteur-fiche';
+
+    const titre = document.createElement('span');
+    titre.className = 'group-title';
+    titre.textContent = calque.type === 'groupe' ? 'Entité' : 'Fiche';
+    bloc.appendChild(titre);
+
+    if (!ficheRenseignee(calque.fiche)) {
+      const note = document.createElement('p');
+      note.className = 'reglages-note';
+      note.textContent = calque.type === 'groupe'
+        ? 'Décrivez ici ce que ce groupe désigne : la peinture, les épingles et les '
+          + 'mesures qu’il contient en deviennent les facettes.'
+        : 'Une description, une nature d’énoncé, des valeurs — attachées à ce calque.';
+      bloc.appendChild(note);
+
+      const ouvrir = document.createElement('button');
+      ouvrir.type = 'button';
+      ouvrir.className = 'inspecteur-action';
+      ouvrir.textContent = calque.type === 'groupe' ? 'Décrire cette entité' : 'Décrire ce calque';
+      ouvrir.addEventListener('click', () => this.surOuvrirFiche?.(calque.id));
+      bloc.appendChild(ouvrir);
+      return bloc;
+    }
+
+    const fiche = calque.fiche;
+    const marque = document.createElement('div');
+    marque.className = 'fiche-marque';
+    marque.dataset.confiance = fiche.confiance ?? 'certain';
+    const nature = document.createElement('span');
+    nature.className = 'fiche-etiquette-nature';
+    nature.dataset.nature = fiche.nature ?? 'constat';
+    nature.textContent = NATURES[fiche.nature]?.libelle ?? 'Constat';
+    const confiance = document.createElement('span');
+    confiance.className = 'fiche-etiquette-confiance';
+    confiance.textContent = CONFIANCES[fiche.confiance]?.libelle ?? 'Certain';
+    marque.append(nature, confiance);
+    bloc.appendChild(marque);
+
+    const resume = String(fiche.texte ?? '').replace(/\s+/g, ' ').trim();
+    if (resume) {
+      const apercu = document.createElement('p');
+      apercu.className = 'reglages-note fiche-apercu';
+      apercu.textContent = resume.length > 140 ? `${resume.slice(0, 140).trim()}…` : resume;
+      bloc.appendChild(apercu);
+    }
+
+    const details = [];
+    if (fiche.methode?.trim()) details.push(fiche.methode.trim());
+    if (fiche.vue) details.push('vue mémorisée');
+    const nombreProprietes = (fiche.proprietes ?? []).filter((p) => p.cle || p.valeur).length;
+    if (nombreProprietes > 0) details.push(`${nombreProprietes} propriété${nombreProprietes > 1 ? 's' : ''}`);
+    if (fiche.medias?.length) details.push(`${fiche.medias.length} média${fiche.medias.length > 1 ? 's' : ''}`);
+    if (details.length > 0) {
+      const ligne = document.createElement('p');
+      ligne.className = 'fiche-signature';
+      ligne.textContent = details.join(' · ');
+      bloc.appendChild(ligne);
+    }
+
+    const ouvrir = document.createElement('button');
+    ouvrir.type = 'button';
+    ouvrir.className = 'inspecteur-action';
+    ouvrir.textContent = 'Ouvrir la fiche';
+    ouvrir.addEventListener('click', () => this.surOuvrirFiche?.(calque.id));
+    bloc.appendChild(ouvrir);
+
+    return bloc;
+  }
+
+  // The same quantity measured on each capture. Three captures of one specimen
+  // taken within the hour are not three states of the object: they are three
+  // measurements of one state, and their spread is the only honest estimate of
+  // what a figure from this pipeline is worth.
+  _comparaison({ lignes, dispersion, note }) {
+    const bloc = document.createElement('div');
+    bloc.className = 'group releve comparaison';
+
+    const titre = document.createElement('span');
+    titre.className = 'group-title';
+    titre.textContent = 'D’une capture à l’autre';
+    bloc.appendChild(titre);
+
+    for (const { etiquette, valeur, absent, courante } of lignes) {
+      const ligne = document.createElement('div');
+      ligne.className = 'releve-ligne';
+      if (absent) ligne.classList.add('comparaison-absente');
+      if (courante) ligne.classList.add('comparaison-courante');
+      ligne.append(
+        Object.assign(document.createElement('span'), { textContent: etiquette }),
+        Object.assign(document.createElement('strong'), { textContent: valeur }),
+      );
+      bloc.appendChild(ligne);
+    }
+
+    if (dispersion) {
+      const ligne = document.createElement('div');
+      ligne.className = 'releve-ligne comparaison-dispersion';
+      ligne.append(
+        Object.assign(document.createElement('span'), { textContent: dispersion.etiquette }),
+        Object.assign(document.createElement('strong'), { textContent: dispersion.valeur }),
+      );
+      if (dispersion.aide) ligne.title = dispersion.aide;
       bloc.appendChild(ligne);
     }
 

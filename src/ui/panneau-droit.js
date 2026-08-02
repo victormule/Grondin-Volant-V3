@@ -93,8 +93,10 @@ export class PanneauDroit {
       sessions: this.sessions,
       couleurs: options.couleurs,
       mesures: (calque) => this.mesures?.(calque) ?? null,
+      comparaison: (calque) => this.comparaison?.(calque) ?? null,
       surConversionRegion: (calque) => this.surConversionRegion?.(calque),
       surLissageRegion: (calque) => this.surLissageRegion?.(calque),
+      surOuvrirFiche: (idCalque) => this.ouvrirFicheCalque(idCalque),
     });
 
     this.fiche = new Fiche(elements.fiche, {
@@ -104,6 +106,8 @@ export class PanneauDroit {
       surFermeture: () => this.fermerFiche(),
       surCentrage: (epingle) => this.surCentrage?.(epingle),
       surSuppression: (idEpingle, idCalque) => this.supprimerEpingle(idEpingle, idCalque),
+      surMemoriserVue: () => this.surMemoriserVue?.() ?? null,
+      surRestituerVue: (vue) => this.surRestituerVue?.(vue),
     });
 
     this._brancherActions();
@@ -135,6 +139,20 @@ export class PanneauDroit {
     this.elements.panneau.classList.add('fiche-ouverte');
     this.surSelectionCalque?.(idCalque);
     this.surSelectionElement?.(idEpingle, idCalque);
+  }
+
+  // The layer as the subject of its own card. Selection is set without
+  // notifying, because the panel's own selection callback closes any open card
+  // — which would shut this one the moment it opened.
+  ouvrirFicheCalque(idCalque) {
+    if (!this.doc.trouver(idCalque)) return;
+    this.surDemandeOuverture?.();
+    this.liste.selectionner(idCalque, false);
+    this.fiche.ouvrirCalque(idCalque);
+    this.elements.panneau.classList.add('fiche-ouverte');
+    this.surSelectionCalque?.(idCalque);
+    this.surSelectionElement?.(null, idCalque);
+    this._majActions();
   }
 
   fermerFiche() {
@@ -176,6 +194,12 @@ export class PanneauDroit {
   }
 
   rafraichir() {
+    // A card whose subject no longer exists — its layer deleted, its pin undone
+    // — closes through the panel rather than through itself, so the panel's own
+    // « card open » state goes with it. Hiding the card alone left the list
+    // pushed aside behind nothing.
+    if (this.fiche.ouverte && !this.doc.trouver(this.fiche.idCalque)) this.fermerFiche();
+
     // Invalidate/recompose before the inspector asks for derived metrics.
     // Doing it afterwards computed an expensive paint area only to discard
     // its cache immediately in the document-change callback.

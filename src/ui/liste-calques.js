@@ -1,7 +1,7 @@
 // The layer list: a tree, in reverse document order, the way every layer panel
 // in every image editor shows it — top of the list is top of the stack.
 
-import { TYPES_CALQUE } from '../document/modele.js';
+import { TYPES_CALQUE, NATURES, CONFIANCES, ficheRenseignee } from '../document/modele.js';
 
 const OEIL_VISIBLE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="2"/></svg>';
 const OEIL_MASQUE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><path d="M3 13 13 3"/></svg>';
@@ -153,6 +153,21 @@ export class ListeCalques {
       this.renommer(calque.id);
     });
     ligne.appendChild(nom);
+
+    // A described layer says so in the panel, and says what kind of statement
+    // it makes. Reading a stack of groups without this means opening each one
+    // to find out which are entities and which are mere folders.
+    if (ficheRenseignee(calque.fiche)) {
+      const marque = document.createElement('span');
+      marque.className = 'calque-fiche';
+      marque.dataset.nature = calque.fiche.nature ?? 'constat';
+      marque.dataset.confiance = calque.fiche.confiance ?? 'certain';
+      marque.textContent = CONFIANCES[calque.fiche.confiance]?.abrege ?? 'C';
+      const nature = NATURES[calque.fiche.nature]?.libelle ?? 'Constat';
+      const confiance = CONFIANCES[calque.fiche.confiance]?.libelle ?? 'Certain';
+      marque.title = `${nature} · ${confiance.toLowerCase()}`;
+      ligne.appendChild(marque);
+    }
 
     if (nombreElements > 0) {
       const compte = document.createElement('span');

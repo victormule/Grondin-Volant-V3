@@ -23,8 +23,10 @@ import { OutilSelection } from './annotations/outil-selection.js';
 import { CoucheContours } from './annotations/contours.js';
 import { CoucheMesures } from './annotations/mesures.js';
 import { OutilMesure } from './annotations/outil-mesure.js';
-import { Metrologie, formaterAire, formaterLongueur, formaterVolume }
-  from './mesure/metriques.js';
+import {
+  Metrologie, formaterAire, formaterLongueur, formaterVolume,
+  formaterAireIncertaine, formaterPourcentage,
+} from './mesure/metriques.js';
 import { Atelier } from './ui/atelier.js';
 import { creerPalette } from './ui/palette.js';
 import { creerDisqueLumiere } from './ui/disque-lumiere.js';
@@ -639,6 +641,18 @@ function majCibles() {
 
 /* ------------------------------------------------------------ métriques */
 
+// Where an area's ± comes from — three different claims, and the read-out is
+// not allowed to pass off the weakest as the strongest.
+const AIDE_INCERTITUDE = {
+  exacte: 'Incertitude = écart entre la somme exacte sur les triangles et l’intégration '
+    + 'de la couverture dans l’atlas. Deux méthodes indépendantes, rien de supposé.',
+  mesuree: 'Incertitude reprise de l’écart entre les deux méthodes, mesuré sur une région '
+    + 'de ce document — la peinture n’a pas de contrepartie exacte à laquelle se comparer.',
+  calibration: 'Incertitude issue de la calibration inscrite dans les réglages : ce document '
+    + 'ne contient aucune région, donc rien ici n’a pu être vérifié en direct. Convertissez '
+    + 'une peinture en région pour obtenir une incertitude mesurée sur ce spécimen.',
+};
+
 // What a layer measures, formatted for the inspector. Every caveat travels
 // with its figure: a number printed without the condition under which it is
 // valid is worse than no number.
@@ -651,9 +665,32 @@ panneauDroit.mesures = (calque) => {
 
   const k = echelle();
   const lignes = [
-    { etiquette: 'Aire', valeur: formaterAire(releve.aire, k) },
+    {
+      etiquette: 'Aire',
+      valeur: formaterAireIncertaine(releve.aire, releve.incertitude, k),
+      aide: `${AIDE_INCERTITUDE[releve.sourceIncertitude ?? 'exacte']} `
+        + 'C’est l’incertitude de la MÉTHODE sur cette capture, pas la reproductibilité '
+        + 'de la mesure : celle-ci se lit plus bas, « D’une capture à l’autre », et elle '
+        + 'est bien plus grande.',
+    },
     { etiquette: 'Périmètre', valeur: formaterLongueur(releve.perimetre, k) },
   ];
+
+  // The share of the entity this layer sits inside. « 35 % de la nageoire
+  // pectorale droite » is the figure a conservator actually writes down, and it
+  // only means anything because the group above now says what it is.
+  const entite = panneauDroit.doc.entiteDe(calque.id);
+  if (entite && releve.aire > 0) {
+    const etendue = aireDUneEntite(entite, calque.id);
+    if (etendue && etendue.aire > releve.aire) {
+      lignes.push({
+        etiquette: `Part de « ${entite.nom} »`,
+        valeur: formaterPourcentage(releve.aire / etendue.aire),
+        aide: `Rapporté aux ${formaterAire(etendue.aire, k)} du calque « ${etendue.nom} », `
+          + `l’étendue que cette entité porte directement.`,
+      });
+    }
+  }
 
   if (releve.methode === 'maillage') {
     lignes.push({ etiquette: 'Faces', valeur: releve.faces.toLocaleString('fr-FR') });
@@ -670,8 +707,14 @@ panneauDroit.mesures = (calque) => {
   }
 
   const notes = [];
+  if (releve.methode === 'maillage' && releve.aireRaster) {
+    const ecart = Math.abs(releve.aire - releve.aireRaster) / releve.aire;
+    notes.push(`Les deux méthodes indépendantes se rejoignent à ${formaterPourcentage(ecart, 2)} `
+      + '(somme exacte sur les triangles contre intégration de la couverture). '
+      + 'C’est cet écart, mesuré ici et maintenant, qui sert d’incertitude.');
+  }
   if (releve.methode === 'atlas') {
-    notes.push('Peinture : l’aire est intégrée sur l’atlas (juste à 0,1 %). Le '
+    notes.push('Peinture : l’aire est intégrée sur l’atlas. Le '
       + 'périmètre est sous-estimé là où la zone traverse une couture UV — jusqu’à '
       + '13 % dans le pire cas. Un volume demande un bord fait d’arêtes : '
       + 'convertissez la zone en région pour l’obtenir.');
@@ -752,6 +795,146 @@ panneauDroit.surLissageRegion = (calqueInitial) => {
   return true;
 };
 
+// The extent of an entity, for the ratio above — and the rule is deliberately
+// strict, because the first version of it lied.
+//
+// It took the largest extent layer anywhere under the entity. On the group
+// « Pectoral », which holds one paint layer per fin, that made the right fin
+// « 91,9 % of Pectoral » when what it had actually been divided by was the LEFT
+// fin. A wrong ratio printed beside two honest measurements is worse than no
+// ratio: it is the one figure a reader cannot check.
+//
+// So nothing is guessed. The whole must be a layer the entity holds DIRECTLY,
+// and there must be exactly one candidate — two means the tree does not say
+// which is the whole. The part must sit deeper than that, inside a sub-group:
+// the nesting is then the user asserting containment, not this function
+// inferring it from a comparison of sizes.
+function aireDUneEntite(entite, idCalque) {
+  const doc = panneauDroit.doc;
+  const enfants = entite.enfants ?? [];
+  if (enfants.some((c) => c.id === idCalque)) return null;
+
+  const candidats = enfants.filter((c) => (c.type === 'peinture' || c.type === 'region')
+    && !doc.contient(c.id, idCalque));
+  if (candidats.length !== 1) return null;
+
+  const releve = metrologie.mesurer(candidats[0], captureCourante);
+  return releve?.aire ? { aire: releve.aire, nom: candidats[0].nom } : null;
+}
+
+/* ------------------------------------------------- d’une capture à l’autre */
+
+// The alignment residuals, produced when the captures were registered onto the
+// first one. A pin placed on session 1 and read on session 3 is not where it
+// was to the millimetre, and this file says by how much. Showing it is the
+// difference between a viewer that shares one frame and one that pretends the
+// frame is exact.
+let recalage = null;
+
+async function chargerRecalage() {
+  const chemin = config.mesure.recalage;
+  if (!chemin) return;
+  try {
+    const reponse = await fetch(chemin, { cache: 'no-store' });
+    if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
+    recalage = await reponse.json();
+    // It usually lands after the first capture is already on screen, so the
+    // read-outs that quote it are asked to say it again.
+    majSpecimen();
+    panneauDroit.inspecteur.rendre();
+  } catch (erreur) {
+    // Not fatal, and not worth a message on screen: the figures below simply
+    // come without their residual rather than not at all.
+    console.warn('Résidus de recalage indisponibles.', erreur);
+  }
+}
+
+// Worst residual across the captures, in model units — the honest single number
+// when a figure concerns all of them at once.
+function residuRecalage() {
+  if (!recalage) return null;
+  let pire = 0;
+  for (const [cle, valeur] of Object.entries(recalage)) {
+    if (!/^session\d+$/.test(cle) || !Number.isFinite(valeur?.rmse)) continue;
+    pire = Math.max(pire, valeur.rmse);
+  }
+  return pire || null;
+}
+
+// The same layer, measured on every capture already in memory.
+//
+// Read this table for what it is. The three captures were taken within an hour
+// of each other, so it does not show the specimen changing — it shows the same
+// state measured three times, and its spread is the repeatability of the whole
+// chain: photogrammetry, alignment, face transfer, estimator. That number is
+// what a single area from this tool is worth. On a specimen re-captured in two
+// years the very same table reads as change instead, against a noise floor that
+// is now known rather than assumed.
+panneauDroit.comparaison = (calque) => {
+  if (calque.type !== 'peinture' && calque.type !== 'region') return null;
+  const chargees = sessionsConnues
+    .map((session, index) => ({ session, capture: atlas.capture(cleCapture(session, index)) }))
+    .filter(({ capture }) => capture && regions.capture(capture.cle));
+  if (chargees.length < 2) return null;
+
+  const k = echelle();
+  const lignes = [];
+  const aires = [];
+  for (const { session, capture } of chargees) {
+    const releve = metrologie.mesurer(calque, capture);
+    const mesurable = releve && releve.aire > 0;
+    if (mesurable) aires.push(releve.aire);
+    lignes.push({
+      etiquette: session.label,
+      valeur: mesurable ? formaterAire(releve.aire, k) : 'non transférée',
+      absent: !mesurable,
+      courante: capture.cle === captureCourante?.cle,
+    });
+  }
+  if (aires.length < 2) return null;
+
+  const moyenne = aires.reduce((somme, valeur) => somme + valeur, 0) / aires.length;
+  const etendue = Math.max(...aires) - Math.min(...aires);
+  const dispersion = {
+    etiquette: 'Écart entre captures',
+    valeur: `${formaterAire(etendue, k)} · ${formaterPourcentage(etendue / moyenne)}`,
+    aide: 'Étendue des valeurs rapportée à leur moyenne.',
+  };
+
+  const notes = [];
+  const manquantes = sessionsConnues.length - chargees.length;
+  if (manquantes > 0) {
+    notes.push(`${manquantes} capture${manquantes > 1 ? 's ne sont' : ' n’est'} pas chargée${manquantes > 1 ? 's' : ''} `
+      + '— ouvrez-la pour la faire entrer dans la comparaison.');
+  }
+  // Measured on this specimen: the estimator agrees with itself to about a
+  // tenth of a percent, while two captures of the same fin disagree by nearly
+  // three. The ± printed above is therefore the smaller, easier claim, and
+  // saying which is which is the difference between an honest read-out and a
+  // falsely precise one.
+  const methode = metrologie.incertitudeRelative ?? config.mesure.incertitudeAire;
+  if (methode && etendue / moyenne > methode * 2) {
+    notes.push(`Cet écart vaut ${formaterPourcentage(etendue / moyenne)}, contre `
+      + `${formaterPourcentage(methode, 2)} d’incertitude de méthode : c’est la reproductibilité, `
+      + 'et non le « ± » affiché plus haut, qui limite ce qu’on peut conclure d’une différence.');
+  }
+
+  const memeJour = new Set(sessionsConnues.map((s) => s.date)).size === 1;
+  notes.push(memeJour
+    ? 'Ces captures ont été prises le même jour : cet écart n’est pas une évolution '
+      + 'du spécimen, c’est la répétabilité de la chaîne de mesure. Toute variation '
+      + 'plus faible que lui, sur une campagne future, ne sera pas interprétable.'
+    : 'Captures de dates différentes : l’écart mêle l’évolution réelle du spécimen '
+      + 'et la répétabilité de la chaîne de mesure.');
+  const residu = residuRecalage();
+  if (residu) {
+    notes.push(`Les captures sont recalées à ${formaterLongueur(residu, k)} près (RMSE), `
+      + 'ce qui borne aussi la fidélité du report d’un calque d’une capture à l’autre.');
+  }
+
+  return { lignes, dispersion, note: notes.join(' ') };
+};
+
 function relevesMesure(calque) {
   const elements = calque.donnees?.elements ?? [];
   if (elements.length === 0) return null;
@@ -808,6 +991,19 @@ function majSpecimen() {
     : `Maillage ouvert (${releve.aretesDeBord.toLocaleString('fr-FR')} arêtes de bord) : `
       + 'le volume ci-dessus n’est qu’un ordre de grandeur.';
   bloc.appendChild(note);
+
+  // Where the metre comes from. Without this line every figure above is
+  // unverifiable: they are all one multiplication away from a reference nobody
+  // can see, and a reader has no way to know whether it was measured on the
+  // specimen or inherited from the capture device.
+  const provenance = document.createElement('p');
+  provenance.className = 'reglages-note';
+  const reference = `${formaterLongueur(Number(config.mesure.longueurModeleReference))} `
+    + `dans le modèle pour ${formaterLongueur(Number(config.mesure.longueurReelleReference))} réels`;
+  const residu = residuRecalage();
+  provenance.textContent = `Échelle : ${reference}. Toutes les valeurs de l’application en découlent.`
+    + (residu ? ` Captures recalées à ${formaterLongueur(residu, k)} près (RMSE).` : '');
+  bloc.appendChild(provenance);
 }
 
 // The selection becomes a named region layer — the point of the whole tool:
@@ -921,6 +1117,10 @@ majCibles();
 
 let departPointeur = null;
 let sessionCourante = null;
+// Every capture the project declares, loaded or not. The comparison read-out
+// needs to know what exists, not only what is in memory, so it can say what is
+// missing rather than silently comparing two captures out of three.
+let sessionsConnues = [];
 // The pointer that owns the gesture in progress. A tablet reports a palm
 // resting on the screen as a second pointer; without this it would paint.
 let pointeurActif = null;
@@ -1118,19 +1318,11 @@ function poserEpingle(x, y) {
   panneauDroit.ouvrirFiche(epingle.id, idCalque);
 }
 
-// Brings a pin into view: same distance, but looking at it from the direction
-// its surface faces, so it is never left behind the specimen.
-panneauDroit.surCentrage = (epingle) => {
-  if (!epingle) return;
-  const cible = new THREE.Vector3(...epingle.position);
-  const normale = new THREE.Vector3(...epingle.normale);
-  const distance = scene3d.camera.position.distanceTo(scene3d.controls.target);
-  const arrivee = cible.clone().addScaledVector(normale, distance);
-
+// One eased flight, used by everything that moves the camera on purpose.
+function allerVers(cible, arrivee, duree = 450) {
   const departCible = scene3d.controls.target.clone();
   const departCamera = scene3d.camera.position.clone();
   const debut = performance.now();
-  const duree = 450;
 
   const animer = () => {
     const part = Math.min((performance.now() - debut) / duree, 1);
@@ -1141,7 +1333,78 @@ panneauDroit.surCentrage = (epingle) => {
     if (part < 1) requestAnimationFrame(animer);
   };
   requestAnimationFrame(animer);
+}
+
+// Brings a pin into view: same distance, but looking at it from the direction
+// its surface faces, so it is never left behind the specimen.
+panneauDroit.surCentrage = (epingle) => {
+  if (!epingle) return;
+  const cible = new THREE.Vector3(...epingle.position);
+  const normale = new THREE.Vector3(...epingle.normale);
+  const distance = scene3d.camera.position.distanceTo(scene3d.controls.target);
+  allerVers(cible, cible.clone().addScaledVector(normale, distance));
 };
+
+/* ------------------------------------------------------- vue d’observation */
+
+// The conditions under which something was seen, recorded so a reader can be
+// put back in them.
+//
+// A varnish loss that only shows at seventy degrees of raking light does not
+// exist for a reader who arrives from an arbitrary orbit under flat ambient
+// light — and « voir photo 4 » is the usual, poor substitute. The camera and
+// the light disc are two vectors and four numbers; storing them turns
+// « visible en lumière rasante » from a claim into something reproducible in
+// one click. Nothing else in a condition report can do this.
+function vueCourante() {
+  return {
+    camera: scene3d.camera.position.toArray(),
+    cible: scene3d.controls.target.toArray(),
+    lumiere: {
+      mode: eclairage.mode,
+      x: eclairage.x,
+      y: eclairage.y,
+      angle: eclairage.angle,
+      ambiance: eclairage.ambiance,
+      intensite: eclairage.cle.intensity,
+    },
+    // Which capture was on screen. The frame is shared, so the viewpoint is
+    // valid on all three; this only records where the observation was made.
+    session: sessionCourante?.id ?? null,
+    prise: new Date().toISOString(),
+  };
+}
+
+function restituerVue(vue) {
+  if (!vue?.camera || !vue?.cible) return;
+
+  const lumiere = vue.lumiere;
+  if (lumiere) {
+    definirModeLumiere(lumiere.mode === 'dirigee' ? 'dirigee' : 'fixe');
+    if (Number.isFinite(lumiere.intensite)) {
+      elements.lumiereForce.value = lumiere.intensite;
+      elements.lumiereForceValeur.textContent = Number(lumiere.intensite).toFixed(2);
+      eclairage.definirIntensite(lumiere.intensite);
+    }
+    if (Number.isFinite(lumiere.ambiance)) {
+      elements.lumiereAmbiance.value = lumiere.ambiance;
+      elements.lumiereAmbianceValeur.textContent = `${Math.round(lumiere.ambiance * 100)} %`;
+      eclairage.definirAmbiance(lumiere.ambiance);
+    }
+    if (Number.isFinite(lumiere.x) && Number.isFinite(lumiere.y)) {
+      // The disc is set without emitting, then the light is aimed once: letting
+      // the widget emit would fire a second, identical change through the
+      // renderer for nothing.
+      disqueLumiere.definir(lumiere.x, lumiere.y);
+      eclairage.definirDirection(lumiere.x, lumiere.y);
+    }
+  }
+
+  allerVers(new THREE.Vector3(...vue.cible), new THREE.Vector3(...vue.camera), 620);
+}
+
+panneauDroit.surMemoriserVue = () => vueCourante();
+panneauDroit.surRestituerVue = (vue) => restituerVue(vue);
 
 // The published file is never written to from here: the draft lives in this
 // browser only, and leaves it through the export button or not at all.
@@ -1320,6 +1583,7 @@ async function chargerSessions() {
     if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
     sessions = await reponse.json();
     if (!Array.isArray(sessions) || sessions.length === 0) throw new Error('Aucune session');
+    sessionsConnues = sessions;
     panneauDroit.definirSessions(sessions);
   } catch (erreur) {
     console.error('sessions.json illisible, retour au modèle par défaut.', erreur);
@@ -1355,6 +1619,7 @@ async function chargerSessions() {
   }
 }
 
+chargerRecalage();
 chargerSessions();
 
 // Handy while comparing against the old viewer.
