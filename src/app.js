@@ -1433,7 +1433,23 @@ panneauDroit.surRestituerVue = (vue) => restituerVue(vue);
 // The published file is never written to from here: the draft lives in this
 // browser only, and leaves it through the export button or not at all.
 async function chargerAnnotations() {
-  const [publie, brouillon] = await Promise.all([chargerPublie(), chargerBrouillon(ID_PROJET)]);
+  const [publieBrut, brouillonBrut] = await Promise.all([chargerPublie(), chargerBrouillon(ID_PROJET)]);
+
+  // A document written before the meshes were redressed holds coordinates in a
+  // frame that no longer exists. Drawing it would put pins in mid-air, close
+  // enough to the specimen to look deliberate — so it is refused instead, and
+  // said out loud rather than dropped in silence.
+  const perime = [];
+  if (brouillonBrut && !DocumentAnnotation.frameCompatible(brouillonBrut.donnees)) perime.push('brouillon local');
+  if (publieBrut && !DocumentAnnotation.frameCompatible(publieBrut)) perime.push('fichier publié');
+  if (perime.length > 0) {
+    console.warn(`Annotations ignorées (${perime.join(' et ')}) : elles ont été posées `
+      + 'sur une géométrie antérieure au redressement du socle. Le repère a changé, '
+      + 'leurs coordonnées ne désignent plus rien.');
+    await supprimerBrouillon(ID_PROJET);
+  }
+  const brouillon = perime.includes('brouillon local') ? null : brouillonBrut;
+  const publie = perime.includes('fichier publié') ? null : publieBrut;
 
   const appliquer = (donnees) => {
     panneauDroit.definirDocument(DocumentAnnotation.deserialiser(donnees));

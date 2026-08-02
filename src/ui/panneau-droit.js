@@ -370,6 +370,15 @@ export class PanneauDroit {
     if (!donnees?.racine || !Array.isArray(donnees.racine.enfants)) {
       return echouer('Ce fichier ne contient pas de document d’annotation.');
     }
+    // Coordinates from a frame this build no longer uses would be drawn in
+    // mid-air, plausibly enough to be mistaken for real placements.
+    if (!DocumentAnnotation.frameCompatible(donnees)) {
+      console.error('Import refusé : document écrit dans le repère '
+        + `« ${donnees.repere ?? 'inconnu'} », antérieur au redressement de la géométrie.`);
+      if (bouton) bouton.disabled = false;
+      this._message(bouton, 'Repère périmé', 4000);
+      return false;
+    }
     donnees.medias = Array.isArray(donnees.medias) ? donnees.medias : [];
 
     // Replacing the layer stack throws away whatever is on screen, and the undo

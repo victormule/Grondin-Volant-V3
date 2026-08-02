@@ -67,3 +67,7 @@ sessions/91D4BE57-FE01-49B7-847D-A0044DAF6CC2/
 #
 #   gltf-transform webp model.original.glb model.glb --quality 90
 *.original.glb
+
+# Sauvegardes du redressement de la géométrie. Les fichiers d’origine sont
+# déjà dans l’historique git : ces copies sont un filet local, pas une archive.
+*.avant-redressement

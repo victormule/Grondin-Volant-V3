@@ -5,6 +5,19 @@
 // the others — which is the whole point of annotating this project. A layer can
 // still be pinned to particular captures through its `portee`.
 
+// Which coordinate frame the stored coordinates belong to.
+//
+// Everything in a document — pin positions, brush dabs, measurement points — is
+// a coordinate in the captures' own frame. Redressing the meshes so the plinth
+// sits level moved that frame, which silently puts every older annotation
+// somewhere it was never placed: a pin on the eye lands in mid-air, and nothing
+// about it looks wrong enough to notice.
+//
+// So a document carries the name of the frame it was written in, and one that
+// does not match this build is refused rather than drawn. Bump this string
+// whenever the geometry is moved again.
+export const REPERE = 'socle-a-plat-2026-08';
+
 export const TYPES_CALQUE = {
   groupe: { libelle: 'Groupe', icone: '▤', contenant: true },
   annotation: { libelle: 'Annotations', icone: '◉' },
@@ -165,9 +178,18 @@ export function creerEpingle(position, normale, session = null) {
 export class DocumentAnnotation {
   constructor(donnees) {
     this.version = donnees?.version ?? 1;
+    this.repere = donnees?.repere ?? null;
     this.sessionReference = donnees?.sessionReference ?? null;
     this.racine = donnees?.racine ?? { id: 'racine', type: 'groupe', enfants: [] };
     this.medias = donnees?.medias ?? [];
+  }
+
+  // An empty document is in whatever frame the build is in, so it always
+  // matches; only stored coordinates can be stale.
+  static frameCompatible(donnees) {
+    if (!donnees) return false;
+    if ((donnees.racine?.enfants?.length ?? 0) === 0) return true;
+    return donnees.repere === REPERE;
   }
 
   static vide(sessionReference) {
@@ -371,6 +393,9 @@ export class DocumentAnnotation {
   serialiser() {
     return {
       version: this.version,
+      // Stamped, never copied: whatever was loaded, what is being written now
+      // was authored against the geometry this build ships.
+      repere: REPERE,
       sessionReference: this.sessionReference,
       racine: structuredClone(this.racine),
       medias: structuredClone(this.medias),

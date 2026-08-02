@@ -308,51 +308,33 @@ window.VIEWER_CONFIG = {
     // Vitesse de la rotation automatique, en degrés par seconde.
     vitesseRotation: 18,
 
-    // APLOMB — la normale du socle, c'est-à-dire la verticale du spécimen.
+    // APLOMB — la verticale du spécimen, quand elle diffère de celle du monde.
     //
-    // Les captures ont été faites téléphone en main : le repère qu'elles
-    // rapportent n'est de niveau avec rien. La petite dalle rectangulaire y
-    // penche de 2,34°, et le montage paraît de travers sous tous les angles.
+    // null depuis que la géométrie a été redressée dans les fichiers eux-mêmes :
+    // les captures arrivaient avec un socle penché de 4,0°, elles sont
+    // maintenant écrites de niveau. Le contrôle après coup donne 0,17°, 0,42° et
+    // 0,17° sur les trois captures.
     //
-    // On ne redresse PAS la géométrie. Les épingles, les empreintes de pinceau
-    // et les points de mesure sont des coordonnées dans ce même repère :
-    // tourner les maillages sous elles décrocherait chaque annotation du
-    // spécimen, et déplacerait en silence tout brouillon déjà enregistré dans
-    // un navigateur. Rien ne bouge donc — c'est la direction que la caméra
-    // appelle « le haut » qui change. Les trois captures en héritent d'un coup
-    // puisqu'elles partagent un repère.
-    //
-    // Mesure : plan des moindres carrés sur 284 sommets de la face supérieure
-    // du socle (normale orientée vers le haut, dans un rayon de 45 cm autour du
-    // pied de la tige). Planéité : 3 mm d'écart médian, 6,6 mm au neuvième
-    // décile — c'est une dalle photogrammétrée, pas un marbre.
-    //
-    // null : on revient au Y du monde.
-    aplomb: [0.03786, 0.99916, 0.01548],
+    // Renseignez une normale ici si vous chargez un jour des captures brutes :
+    // faites-en tourner la caméra plutôt que la géométrie tant que des
+    // annotations existent, car elles sont écrites dans le repère des fichiers.
+    aplomb: null,
 
     // AXE DE LA ROTATION AUTOMATIQUE — un point qu'il traverse et sa direction.
     //
     // Sans lui, la rotation tourne autour de la verticale passant par le centre
-    // de la boîte englobante. Or cette boîte contient toute la scène capturée :
-    // la table drapée en occupe les deux tiers du bas, et son centre tombe au
-    // milieu du tissu. Le poisson, petit et posé en haut sur le côté, décrivait
-    // un grand cercle autour d'un axe qui ne le traversait pas — un manège,
-    // pas un tour de socle.
+    // de la boîte englobante — ce qui, avant le rognage, tombait au milieu de
+    // la nappe : le poisson décrivait un grand cercle autour d'un axe qui ne le
+    // traversait pas, un manège plutôt qu'un tour de socle.
     //
-    // Le point est le centre de la tige métallique, ajusté par une droite sur
-    // ses sommets tranche par tranche : rayon moyen 0,008 unité (~5,2 mm réels,
-    // soit bien un diamètre de tige et non un filament de nageoire), résidu
-    // maximal 0,002 unité (~0,7 mm).
-    //
-    // La direction, elle, est la normale du socle et NON l'axe propre de la
-    // tige. Les deux diffèrent de 4,6° : la tige n'est pas tout à fait
-    // d'équerre sur sa dalle. Tourner autour de la tige elle-même ferait alors
-    // basculer l'horizon une fois par tour, puisque le haut de la caméra suit
-    // le socle. Tourner d'équerre au socle, c'est faire pivoter la pièce sur sa
-    // base — ce qu'on veut voir.
+    // Le redressement a posé l'origine au pied de la tige et le socle à plat,
+    // si bien que l'axe cherché est devenu l'axe Y lui-même. On l'écrit quand
+    // même explicitement : la boîte englobante reste bien plus large que le
+    // socle — les nageoires débordent de part et d'autre — donc son centre ne
+    // retomberait pas sur la tige.
     axeRotation: {
-      point: [-0.07347, 0.81043, 0.10117],
-      direction: [0.03786, 0.99916, 0.01548],
+      point: [0, 0, 0],
+      direction: [0, 1, 0],
     },
 
     // Mode « Toutes les sessions ».
