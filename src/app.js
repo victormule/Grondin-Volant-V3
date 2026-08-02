@@ -622,6 +622,15 @@ outilSelection.surChangement = (selection) => {
   elementsSelection.creer.disabled = selection.size === 0;
   contours.montrerApercu(outilSelection.geometrie(), outilSelection.segments());
   scene3d.demanderRendu();
+
+  // Said on the view, not only in the panel. A selection is made by looking at
+  // the specimen, and until it is turned into a layer it is worth nothing —
+  // yet the one key that does it was written down nowhere the eye was.
+  // Highlighted faces with no visible way forward read as a dead end.
+  afficherStatut(selection.size === 0
+    ? ''
+    : `${selection.size.toLocaleString('fr-FR')} faces sélectionnées · `
+      + 'Entrée pour en faire une région · Échap pour annuler');
 };
 
 // Every tool panel says where its work will land, and the palettes show that
@@ -1058,6 +1067,16 @@ window.addEventListener('keydown', (evenement) => {
   if (evenement.key === 'Enter' && !outilSelection.vide) {
     evenement.preventDefault();
     creerRegion();
+    return;
+  }
+  // Clears the selection and stays in the tool. Escape already dropped it, but
+  // only as a side effect of the rail switching back to « Naviguer » — so the
+  // way to start a selection over was to leave the tool and come back. Now the
+  // on-screen hint can promise it, and pressing it twice still leaves.
+  if (evenement.key === 'Escape' && !outilSelection.vide) {
+    evenement.preventDefault();
+    evenement.stopImmediatePropagation();
+    outilSelection.vider();
   }
 });
 

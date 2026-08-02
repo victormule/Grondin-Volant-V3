@@ -93,10 +93,10 @@ export class Inspecteur {
 
     this.conteneur.appendChild(this._fiche(calque));
 
-    const releve = this.mesures?.(calque);
+    const releve = this._relever('Mesures', () => this.mesures?.(calque));
     if (releve) this.conteneur.appendChild(this._releve(releve));
 
-    const comparaison = this.comparaison?.(calque);
+    const comparaison = this._relever('D’une capture à l’autre', () => this.comparaison?.(calque));
     if (comparaison) this.conteneur.appendChild(this._comparaison(comparaison));
 
     if (calque.type === 'peinture' && (calque.donnees?.elements.length ?? 0) > 0
@@ -204,6 +204,27 @@ export class Inspecteur {
       bloc.appendChild(texte);
     }
     return bloc;
+  }
+
+  // A read-out that throws must cost its own block, not the panel.
+  //
+  // This is not defensive habit: a single missing variable in the region
+  // measurement blanked the whole inspector — name, opacity, colour, scope,
+  // lock, everything — and the failure looked like « regions have no data »
+  // rather than like a bug three files away. Whatever else breaks later, the
+  // controls that let the user carry on working stay on screen, and the reason
+  // reaches the console instead of vanishing.
+  _relever(quoi, calcul) {
+    try {
+      return calcul();
+    } catch (erreur) {
+      console.error(`Relevé « ${quoi} » indisponible pour ce calque.`, erreur);
+      this.conteneur.appendChild(Object.assign(document.createElement('p'), {
+        className: 'reglages-note',
+        textContent: `${quoi} : calcul impossible sur ce calque (voir la console).`,
+      }));
+      return null;
+    }
   }
 
   // The layer's own card, or the offer to open one.

@@ -79,6 +79,7 @@ export class Metrologie {
 
     const { volume, boucles, ouverte } = volumePatch(entree.analyse, faces);
     const aire = aireFaces(entree.analyse, faces);
+    const perimetre = perimetreFaces(entree.analyse, faces);
 
     // The same area, by the other route. A region is the one layer both methods
     // can measure, so it is where the raster estimator gets checked against an
