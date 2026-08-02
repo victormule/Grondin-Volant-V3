@@ -16,7 +16,7 @@
 // So a document carries the name of the frame it was written in, and one that
 // does not match this build is refused rather than drawn. Bump this string
 // whenever the geometry is moved again.
-export const REPERE = 'socle-a-plat-2026-08';
+export const REPERE = 'socle-net-2026-08';
 
 export const TYPES_CALQUE = {
   groupe: { libelle: 'Groupe', icone: '▤', contenant: true },
