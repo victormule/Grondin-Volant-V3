@@ -157,23 +157,52 @@ export class Scene3D {
     this.demanderRendu();
   }
 
+  // Runs `action` with every loaded capture visible, then puts the visibility
+  // back as it was.
+  //
+  // For the contact shadow, which is cast by photographing the scene from
+  // below. In composite mode that pass would come back empty: the three
+  // captures are made visible one at a time inside the frame and all left
+  // hidden between frames, so anything looking at the scene from outside the
+  // render loop sees nothing at all.
+  avecToutesLesCouches(action) {
+    const etats = this.couches.map((couche) => couche?.visible);
+    for (const couche of this.couches) if (couche) couche.visible = true;
+    try {
+      action();
+    } finally {
+      this.couches.forEach((couche, i) => { if (couche) couche.visible = etats[i]; });
+    }
+  }
+
   /* -------------------------------------------------------------- caméra */
 
-  // Frames the model the way model-viewer did: aimed at the centre of the
-  // bounding box, azimuth 0 (front), polar 75°.
+  // The opening view, and the one « Recentrer » comes back to.
+  //
+  // Aimed at the centre of the bounding box, from an azimuth and an elevation
+  // set in the settings. Angles rather than a stored camera position: the
+  // framing distance still has to be computed from the bounding box, so that
+  // the specimen fills the same share of the frame whatever its size and
+  // whatever the window it is shown in.
   cadrer(boite) {
+    const vue = this.config.affichage.vueInitiale ?? {};
+    const azimut = Number.isFinite(vue.azimut) ? vue.azimut : 0;
+    // Given as a height above the horizon, which is how one describes a
+    // viewpoint; three counts its polar angle down from the vertical.
+    const elevation = Number.isFinite(vue.elevation) ? vue.elevation : 15;
+    const marge = (Number.isFinite(vue.marge) ? vue.marge : 1) * this.config.camera.marge;
+
     const cible = boite.getCenter(new THREE.Vector3());
-    const direction = new THREE.Vector3().setFromSpherical(
-      new THREE.Spherical(1, THREE.MathUtils.degToRad(75), 0),
-    );
-    // The 75° is measured from up, so it has to be tilted into the specimen's
-    // own up — otherwise the opening view is the only one in the application
-    // that is still framed on the capture's accidental horizon.
+    const direction = new THREE.Vector3().setFromSpherical(new THREE.Spherical(
+      1, THREE.MathUtils.degToRad(90 - elevation), THREE.MathUtils.degToRad(azimut),
+    ));
+    // The elevation is measured from up, so it has to be tilted into the
+    // specimen's own up — otherwise the opening view is the only one in the
+    // application still framed on the capture's accidental horizon.
     if (this.aplomb) {
       direction.applyQuaternion(_quaternion.setFromUnitVectors(_hautMonde, this.aplomb));
     }
-    const distance = distanceDeCadrage(boite, cible, direction, this.camera)
-      * this.config.camera.marge;
+    const distance = distanceDeCadrage(boite, cible, direction, this.camera) * marge;
 
     this.controls.target.copy(cible);
     this.camera.position.copy(cible).addScaledVector(direction, distance);
@@ -188,6 +217,28 @@ export class Scene3D {
   recentrer() {
     this.controls.reset();
     this.demanderRendu();
+  }
+
+  // The current viewpoint, written as the settings that would reproduce it.
+  //
+  // Choosing an opening view by editing three numbers and reloading is a slow
+  // way to work; placing the specimen by hand and reading the numbers off is
+  // not. Exposed on window.DURAIR for exactly that.
+  vueActuelle() {
+    const decalage = this.camera.position.clone().sub(this.controls.target);
+    if (this.aplomb) {
+      decalage.applyQuaternion(_quaternion.setFromUnitVectors(this.aplomb, _hautMonde));
+    }
+    const spherique = new THREE.Spherical().setFromVector3(decalage);
+    const boite = new THREE.Box3();
+    for (const couche of this.couches) if (couche) boite.expandByObject(couche);
+    const reference = distanceDeCadrage(boite, boite.getCenter(new THREE.Vector3()),
+      decalage.clone().normalize(), this.camera) * this.config.camera.marge;
+    return {
+      azimut: Math.round(THREE.MathUtils.radToDeg(spherique.theta) * 10) / 10,
+      elevation: Math.round((90 - THREE.MathUtils.radToDeg(spherique.phi)) * 10) / 10,
+      marge: Math.round((spherique.radius / reference) * 1000) / 1000,
+    };
   }
 
   // Which way is up for THIS specimen: the normal of its own base plate.

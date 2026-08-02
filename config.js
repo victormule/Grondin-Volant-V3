@@ -305,6 +305,25 @@ window.VIEWER_CONFIG = {
 
     // Panneau de calques (à droite) ouvert au chargement.
     panneauCalquesOuvert: true,
+    // VUE D'OUVERTURE — celle du chargement, et celle où « Recentrer » revient.
+    //
+    // Des angles plutôt qu'une position de caméra enregistrée : la distance de
+    // cadrage se recalcule sur la boîte englobante, si bien que le spécimen
+    // occupe la même part de l'image quelle que soit sa taille et quelle que
+    // soit la fenêtre.
+    //
+    //   azimut    : rotation autour de la verticale, en degrés. 0 regarde
+    //               depuis +Z, 90 depuis +X.
+    //   elevation : hauteur au-dessus de l'horizon, en degrés. 0 est de niveau,
+    //               90 à la verticale au-dessus.
+    //   marge     : multiplie la distance. 1 laisse le cadrage automatique,
+    //               au-dessus on recule, en dessous on serre.
+    //
+    // Pour en choisir une autre : placez le spécimen à la main dans la vue,
+    // puis tapez DURAIR.vueActuelle() dans la console — les trois nombres à
+    // recopier ici en sortent.
+    vueInitiale: { azimut: 87, elevation: 30, marge: 0.85 },
+
     // Vitesse de la rotation automatique, en degrés par seconde.
     vitesseRotation: 18,
 

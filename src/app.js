@@ -229,8 +229,6 @@ elements.lumiereAmbiance.addEventListener('input', () => {
 
 definirModeLumiere(config.light.mode === 'souris' ? 'dirigee' : config.light.mode);
 
-ombre.intensite = config.ombre.intensite;
-
 /* -------------------------------------------------------------- matière */
 
 elements.reflet.value = config.matiere.rugosite;
@@ -248,6 +246,11 @@ function appliquerMatiereGlobale() {
       anisotropie,
     });
   }
+  // A body one can see through does not stop the light either. The shadow is
+  // rendered on its own — no light in the scene reaches it — so it has to be
+  // told: left at full strength under a specimen faded to a quarter, it read as
+  // a solid object's shadow under a ghost.
+  ombre.intensite = config.ombre.intensite * opacite;
   scene3d.demanderRendu();
 }
 
@@ -1562,7 +1565,7 @@ async function choisirSession(session, index, bouton) {
   if (revision !== revisionVue) return;
   scene3d.afficherCouche(index);
   ombre.visible = true;
-  requestAnimationFrame(() => ombre.rafraichir());
+  requestAnimationFrame(() => scene3d.avecToutesLesCouches(() => ombre.rafraichir()));
   definirSourcesAR(session.glb, session.usdz);
   sessionCourante = session;
   // Each capture has its own UV atlas, so the paint has to be rasterised
@@ -1603,8 +1606,14 @@ async function choisirComposite(sessions, bouton) {
   }
   if (revision !== revisionVue) return;
   scene3d.afficherComposite();
-  // The old version set shadow-intensity to 0 on the stacked layers.
-  ombre.visible = false;
+  // The old version dropped the shadow on the stacked layers; there was never a
+  // technical reason for it. The shadow lives in the scene, so it is drawn into
+  // each of the three captures and comes out of the stack unchanged — averaging
+  // three identical images gives that image back. What it does need is for the
+  // captures to be visible while it is computed, which composite mode leaves
+  // them not to be.
+  ombre.visible = true;
+  requestAnimationFrame(() => scene3d.avecToutesLesCouches(() => ombre.rafraichir()));
   definirSourcesAR(sessions[0].glb, sessions[0].usdz);
   // Every capture is on screen at once, so no layer is out of scope.
   sessionCourante = null;
@@ -1664,6 +1673,9 @@ chargerSessions();
 
 // Handy while comparing against the old viewer.
 window.DURAIR = {
+  // Place the specimen by hand, then read the three numbers to paste into
+  // config.affichage.vueInitiale.
+  vueActuelle: () => scene3d.vueActuelle(),
   scene3d, eclairage, ombre, config, THREE, pile, panneauDroit,
   coucheEpingles, barreOutils, pointeur, medias: bibliotheque, atlas, pinceau,
   regions, contours, outilSelection, creerRegion,
