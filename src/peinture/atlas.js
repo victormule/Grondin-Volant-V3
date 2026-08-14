@@ -21,6 +21,11 @@ import {
   creerMateriauCopie, creerMateriauDilatation,
 } from './rasteriseur.js';
 import { creerMateriauRegion } from './regions.js';
+import { genreElement } from '../document/modele.js';
+
+// The content this file knows how to turn into colour on the surface. Anything
+// else in a layer — a pin, a measurement — is simply not the atlas's business.
+const PEINTS = new Set(['trace', 'region']);
 
 function cible(taille) {
   const rt = new THREE.WebGLRenderTarget(taille, taille, {
@@ -190,18 +195,16 @@ export class AtlasPeinture {
 
   // Coverage of one layer, in one capture's UV space. Public because the
   // measurements read it back: an area is the integral of exactly this.
+  //
+  // Strokes and regions are walked together, in document order, so that an
+  // eraser stroke recorded after a region can take a bite out of it and one
+  // recorded before it cannot. Regions are drawn as a single mesh at the
+  // position of the first region element, which is where their fill enters
+  // the stack.
   rasteriserCalque(capture, calque, rt = this.masque, effacer = true) {
+    const elements = calque.donnees?.elements ?? [];
     if (effacer) this._viderCible(rt);
     if (!capture) return rt;
-
-    if (calque.type === 'region') {
-      const geometrie = this.fournirRegion?.(calque, capture.cle);
-      if (!geometrie) return rt;
-      this.meshRegion.geometry = geometrie;
-      this.renderer.setRenderTarget(rt);
-      this.renderer.render(this.sceneRegion, this.cameraNulle);
-      return rt;
-    }
 
     let lot = [];
     let optionsLot = null;
@@ -213,13 +216,32 @@ export class AtlasPeinture {
       lot = [];
     };
 
-    for (const trait of calque.donnees?.elements ?? []) {
-      const empreintes = trait.empreintes;
+    const regions = elements.filter((element) => genreElement(element) === 'region');
+    let regionsFaites = regions.length === 0;
+
+    for (const element of elements) {
+      const genre = genreElement(element);
+
+      if (genre === 'region') {
+        if (regionsFaites) continue;
+        regionsFaites = true;
+        viderLot();
+        optionsLot = null;
+        const geometrie = this.fournirRegion?.(calque, capture.cle);
+        if (!geometrie) continue;
+        this.meshRegion.geometry = geometrie;
+        this.renderer.setRenderTarget(rt);
+        this.renderer.render(this.sceneRegion, this.cameraNulle);
+        continue;
+      }
+
+      if (genre !== 'trace') continue;
+      const empreintes = element.empreintes;
       if (!empreintes || empreintes.length === 0) continue;
       const options = {
-        durete: trait.durete ?? 0.5,
-        seuilNormale: trait.seuilNormale ?? 0,
-        efface: trait.efface === true,
+        durete: element.durete ?? 0.5,
+        seuilNormale: element.seuilNormale ?? 0,
+        efface: element.efface === true,
       };
       const memesOptions = optionsLot
         && optionsLot.durete === options.durete
@@ -239,11 +261,17 @@ export class AtlasPeinture {
     return rt;
   }
 
-  _composerCalque(calque, rt, opacite = calque.opacite) {
+  _composer(couleur, rt, opacite) {
     this.matComposition.uniforms.masque.value = this.masque.texture;
-    this.matComposition.uniforms.couleur.value.set(calque.couleur);
+    this.matComposition.uniforms.couleur.value.set(couleur);
     this.matComposition.uniforms.opacite.value = opacite;
     this._quad(this.matComposition, rt);
+  }
+
+  // One layer onto one target: rasterise its coverage, then colour it.
+  _composerCalque(capture, calque, rt, opacite) {
+    this.rasteriserCalque(capture, calque, this.masque);
+    this._composer(calque.couleur, rt, opacite);
   }
 
   /* -------------------------------------------------------- composition */
@@ -254,13 +282,16 @@ export class AtlasPeinture {
   // The scope filter uses the capture's own session, not « the session on
   // screen ». In composite mode that is what makes a layer restricted to
   // session 2 appear on capture 2 and nowhere else, instead of on all three.
+  // Which layers have anything to put in it — asked of their content, not of
+  // their declared type. A layer aimed at by the brush but never painted on has
+  // nothing to compose, whatever it calls itself.
   calquesPeinture(doc, capture) {
     return doc.aplatir()
       .map(({ calque }) => calque)
-      .filter((calque) => (calque.type === 'peinture' || calque.type === 'region')
+      .filter((calque) => !calque.enfants
         && doc.visibleEffectivement(calque.id)
         && doc.concerneSession(calque, capture.session)
-        && (calque.donnees?.elements.length ?? 0) > 0);
+        && (calque.donnees?.elements ?? []).some((e) => PEINTS.has(genreElement(e))));
   }
 
   // Full recomposition of every capture on screen, bottom layer to top.
@@ -283,8 +314,7 @@ export class AtlasPeinture {
   _recomposerCapture(doc, capture) {
     this._viderCible(capture.sortie);
     for (const calque of this.calquesPeinture(doc, capture)) {
-      this.rasteriserCalque(capture, calque, this.masque);
-      this._composerCalque(calque, capture.sortie, doc.opaciteEffective(calque.id));
+      this._composerCalque(capture, calque, capture.sortie, doc.opaciteEffective(calque.id));
     }
     this._dilater(capture.sortie);
   }
@@ -311,8 +341,7 @@ export class AtlasPeinture {
     calques.forEach((calque, i) => {
       if (calque.id === idCalque) return;
       const destination = (index === -1 || i > index) ? this.dessus : this.dessous;
-      this.rasteriserCalque(capture, calque, this.masque);
-      this._composerCalque(calque, destination, doc.opaciteEffective(calque.id));
+      this._composerCalque(capture, calque, destination, doc.opaciteEffective(calque.id));
     });
 
     this._viderCible(this.masque);
@@ -339,7 +368,7 @@ export class AtlasPeinture {
     this.matCopie.uniforms.source.value = this.dessous.texture;
     this._quad(this.matCopie, capture.sortie);
     if (this.calqueActif) {
-      this._composerCalque(this.calqueActif, capture.sortie, this.opaciteCalqueActif);
+      this._composer(this.calqueActif.couleur, capture.sortie, this.opaciteCalqueActif);
     }
     this.matCopie.uniforms.source.value = this.dessus.texture;
     this._quad(this.matCopie, capture.sortie);
@@ -361,7 +390,7 @@ export class AtlasPeinture {
     const calques = this.calquesPeinture(doc, capture);
     const actif = doc.trouver(idCalque);
     const index = calques.findIndex((calque) => calque.id === idCalque);
-    if (!actif || index < 0 || (actif.type !== 'peinture' && actif.type !== 'region')) return false;
+    if (!actif || index < 0) return false;
 
     const cle = `${capture.cle}:${idCalque}`;
     if (this.apercuCalque?.cle !== cle) {
@@ -370,17 +399,15 @@ export class AtlasPeinture {
       calques.forEach((calque, i) => {
         if (i === index) return;
         const destination = i > index ? this.dessus : this.dessous;
-        this.rasteriserCalque(capture, calque, this.masque);
-        this._composerCalque(calque, destination, doc.opaciteEffective(calque.id));
+        this._composerCalque(capture, calque, destination, doc.opaciteEffective(calque.id));
       });
-      this.rasteriserCalque(capture, actif, this.masque);
       this.apercuCalque = { cle };
     }
 
     this._viderCible(capture.sortie);
     this.matCopie.uniforms.source.value = this.dessous.texture;
     this._quad(this.matCopie, capture.sortie);
-    this._composerCalque(actif, capture.sortie, doc.opaciteEffective(actif.id));
+    this._composerCalque(capture, actif, capture.sortie, doc.opaciteEffective(actif.id));
     this.matCopie.uniforms.source.value = this.dessus.texture;
     this._quad(this.matCopie, capture.sortie);
     this._dilater(capture.sortie, Math.min(1, this.dilatations));

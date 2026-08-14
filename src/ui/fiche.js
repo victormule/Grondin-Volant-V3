@@ -1,23 +1,24 @@
 // The card: what is said about something, and on what grounds.
 //
-// It slides over the layer list rather than squeezing into the inspector —
-// a photo and a paragraph need the room, and covering the list is reversible
-// where cramming is not.
+// ONE SUBJECT, and it is always a layer. A pin used to carry a card of its own
+// while the layer holding it carried another, which meant two titles for one
+// observation and a reader who could not tell which was the statement. An
+// annotation is a layer now, so « the card of this thing » has exactly one
+// meaning, and a painted zone, a region and a measurement can have one for the
+// first time.
 //
-// One card serves two subjects, because they are the same kind of statement
-// written about two different things:
-//
-//   • a pin   — a point on the specimen, with a title of its own;
-//   • a layer — the entity itself. « Perte de vernis » is not a pin and not a
-//     paint stroke: it is the thing both of them are about. Before layers could
-//     carry a card, describing one meant creating a paint layer AND an
-//     annotation layer with the same name, and hoping the reader would connect
-//     them. The group was already the entity; it just had no right to speak.
+// It floats at the foot of the view rather than filling the layer panel. A card
+// that takes the panel over hides the stack it is about: you could not look at
+// what you were describing and at where it sits at the same time, and closing
+// the card was the only way to check. Down here it covers the plinth, which is
+// the one part of the view nothing is ever annotated on.
 
 import { rendreMarkdown } from './texte.js';
+import { marquerPastille } from './glyphes.js';
 import { genreDepuisType } from '../annotations/medias.js';
 import {
-  NATURES, CONFIANCES, METHODES, TYPES_CALQUE, creerFiche, normaliserFiche,
+  NATURES, CONFIANCES, METHODES, GENRES, creerFiche, normaliserFiche,
+  typeAffiche, genresDuCalque,
 } from '../document/modele.js';
 
 export class Fiche {
@@ -35,8 +36,12 @@ export class Fiche {
     this.surRestituerVue = options.surRestituerVue;
 
     this.idCalque = null;
-    this.idEpingle = null;
     this.editionTexte = false;
+    // Which folded sections are open. On the instance, not in the document:
+    // this is how someone is working right now, not a fact about the specimen.
+    this.sectionsOuvertes = new Set();
+    // Set by the panel: wires the resize handle each time the card is rebuilt.
+    this.surPoignee = null;
   }
 
   definirDocument(doc) {
@@ -44,18 +49,7 @@ export class Fiche {
     if (this.ouverte) this.rendre();
   }
 
-  ouvrir(idEpingle, idCalque) {
-    this.idEpingle = idEpingle;
-    this.idCalque = idCalque;
-    this.editionTexte = false;
-    this.conteneur.hidden = false;
-    this.rendre();
-  }
-
-  // The layer itself as the subject. No pin id: that absence is what the rest
-  // of the class reads to know which of the two it is showing.
-  ouvrirCalque(idCalque) {
-    this.idEpingle = null;
+  ouvrir(idCalque) {
     this.idCalque = idCalque;
     this.editionTexte = false;
     this.conteneur.hidden = false;
@@ -63,32 +57,25 @@ export class Fiche {
   }
 
   fermer() {
-    this.idEpingle = null;
     this.idCalque = null;
     this.conteneur.hidden = true;
+    this.conteneur.replaceChildren();
   }
 
   get ouverte() {
     return Boolean(this.idCalque);
   }
 
-  // Which of the two subjects is on screen. A pin always carries its layer id
-  // too, so the absence of a pin id is what tells them apart.
-  get surCalque() {
-    return Boolean(this.idCalque && !this.idEpingle);
-  }
-
   /* ------------------------------------------------------------- le sujet */
 
   // Resolved on every access: undo swaps the whole document, so a reference
-  // captured earlier would point at a detached copy.
+  // captured earlier would point at a detached copy. A layer that has never
+  // been described reads as an empty card rather than as nothing — writing one
+  // field is what actually creates it.
   _sujet() {
     const calque = this.idCalque && this.doc.trouver(this.idCalque);
     if (!calque) return null;
-    if (this.surCalque) return normaliserFiche(calque.fiche) ?? creerFiche();
-    if (!calque.donnees) return null;
-    const epingle = calque.donnees.elements.find((e) => e.id === this.idEpingle);
-    return epingle ? normaliserFiche(epingle) : null;
+    return normaliserFiche(calque.fiche) ?? creerFiche();
   }
 
   // Mutations are applied to the live object inside the document, never to the
@@ -99,16 +86,9 @@ export class Fiche {
     this.surMutation(nom, () => {
       const calque = this.doc.trouver(this.idCalque);
       if (!calque) return;
-      let cible;
-      if (this.surCalque) {
-        calque.fiche = normaliserFiche(calque.fiche) ?? creerFiche();
-        cible = calque.fiche;
-      } else {
-        cible = calque.donnees?.elements.find((e) => e.id === this.idEpingle);
-      }
-      if (!cible) return;
-      mutation(cible, calque);
-      cible.modifie = new Date().toISOString();
+      calque.fiche = normaliserFiche(calque.fiche) ?? creerFiche();
+      mutation(calque.fiche, calque);
+      calque.fiche.modifie = new Date().toISOString();
     });
   }
 
@@ -117,70 +97,148 @@ export class Fiche {
     if (!sujet) { this.fermer(); return; }
     const calque = this.doc.trouver(this.idCalque);
 
+    // The scroll position survives a re-render. Every field commits through a
+    // document mutation, which rebuilds the whole card; without this, typing a
+    // property at the bottom threw you back to the top after each field.
+    const defilement = this.conteneur.querySelector('.fiche-corps')?.scrollTop ?? 0;
+
     this.conteneur.replaceChildren();
     this.conteneur.append(
-      this._entete(calque),
-      this._titre(sujet, calque),
-      this._qualification(sujet),
-      this._conditions(sujet),
-      this._texte(sujet),
-      this._vue(sujet),
-      this._medias(sujet),
-      this._proprietes(sujet),
-      this._signature(sujet),
-      this._actions(),
+      this._poignee(),
+      this._entete(sujet, calque),
+      this._corps(sujet, calque),
     );
+    const corps = this.conteneur.querySelector('.fiche-corps');
+    if (corps) corps.scrollTop = defilement;
   }
 
-  _entete(calque) {
+  // The top edge, draggable. A card is sometimes one line and sometimes a page;
+  // deciding its height once, for everyone, would be wrong either way.
+  _poignee() {
+    const poignee = document.createElement('div');
+    poignee.className = 'fiche-poignee';
+    poignee.setAttribute('role', 'separator');
+    poignee.setAttribute('aria-orientation', 'horizontal');
+    poignee.title = 'Glisser pour redimensionner · double-cliquer pour réinitialiser';
+    poignee.appendChild(document.createElement('span'));
+    this.surPoignee?.(poignee);
+    return poignee;
+  }
+
+  // Name, kind and statement on one line.
+  //
+  // These four were four stacked blocks taking a third of the card before a
+  // word of it could be read. They belong together — « ce que c'est, comment ça
+  // s'appelle, et quel genre d'énoncé c'est » is one thought — and the nature
+  // buttons only need their full width when someone is actually changing them.
+  _entete(sujet, calque) {
     const entete = document.createElement('div');
     entete.className = 'fiche-entete';
 
-    const retour = document.createElement('button');
-    retour.type = 'button';
-    retour.className = 'fiche-retour';
-    retour.textContent = '← Propriétés du calque';
-    retour.addEventListener('click', () => this.surFermeture?.());
+    const modele = typeAffiche(calque);
+    const pastille = document.createElement('span');
+    pastille.className = 'fiche-pastille';
+    marquerPastille(pastille, calque);
+    const genres = genresDuCalque(calque);
+    pastille.title = calque.enfants
+      ? 'Groupe'
+      : (genres.length > 0 ? GENRES[genres[0]].libelle : modele.libelle);
 
-    const titre = document.createElement('span');
-    titre.className = 'group-title';
-    if (this.surCalque) {
-      const modele = TYPES_CALQUE[calque?.type] ?? TYPES_CALQUE.annotation;
-      titre.textContent = calque?.type === 'groupe' ? 'Entité' : `Fiche · ${modele.libelle}`;
-    } else {
-      titre.textContent = 'Annotation';
-    }
+    const champ = this._titre(calque);
 
-    entete.append(retour, titre);
+    const fermer = document.createElement('button');
+    fermer.type = 'button';
+    fermer.className = 'fiche-fermer';
+    fermer.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+    fermer.title = 'Fermer la fiche (Échap)';
+    fermer.setAttribute('aria-label', 'Fermer la fiche');
+    fermer.addEventListener('click', () => this.surFermeture?.());
+
+    entete.append(pastille, champ, this._qualification(sujet), fermer);
     return entete;
   }
 
-  // A pin owns its title. A layer is titled by its name in the panel, and
-  // having two editable titles for one thing would be a trap: the card would
-  // say one name and the layer row another.
-  _titre(sujet, calque) {
+  // Everything under the header scrolls; the header itself stays put, so the
+  // name and the way out never scroll off a long card.
+  //
+  // The text comes first and is the only thing given room by default. What
+  // remains — the conditions of examination, the recorded viewpoint, the media,
+  // the properties — is real, is needed, and is not what you look at while
+  // writing; each folds into one line until it is opened. The card went from
+  // nine blocks always on screen to one paragraph and four closed drawers.
+  _corps(sujet, calque) {
+    const corps = document.createElement('div');
+    corps.className = 'fiche-corps';
+    corps.append(
+      this._texte(sujet),
+      this._section('conditions', 'Conditions d’examen', this._resumeConditions(sujet),
+        () => this._conditions(sujet)),
+      this._section('vue', 'Vue d’observation', sujet.vue ? 'mémorisée' : null,
+        () => this._vue(sujet)),
+      this._section('medias', 'Médias', sujet.medias?.length ? String(sujet.medias.length) : null,
+        () => this._medias(sujet)),
+      this._section('proprietes', 'Propriétés', this._resumeProprietes(sujet),
+        () => this._proprietes(sujet)),
+      this._section('affichage', 'Affichage', calque.etiquette === false ? 'sans étiquette' : null,
+        () => this._affichage(calque)),
+      this._signature(sujet),
+      this._actions(calque),
+    );
+    return corps;
+  }
+
+  // A folded block. Which ones are open is remembered on the instance rather
+  // than in the document: it is how someone is working right now, not something
+  // about the specimen.
+  _section(cle, titre, resume, contenu) {
+    const bloc = document.createElement('details');
+    bloc.className = 'fiche-section';
+    bloc.open = this.sectionsOuvertes.has(cle);
+    bloc.addEventListener('toggle', () => {
+      if (bloc.open) this.sectionsOuvertes.add(cle);
+      else this.sectionsOuvertes.delete(cle);
+    });
+
+    const entete = document.createElement('summary');
+    entete.append(Object.assign(document.createElement('span'), {
+      className: 'fiche-section-titre', textContent: titre,
+    }));
+    if (resume) {
+      entete.append(Object.assign(document.createElement('span'), {
+        className: 'fiche-section-resume', textContent: resume,
+      }));
+    }
+    bloc.append(entete, contenu());
+    return bloc;
+  }
+
+  _resumeConditions(sujet) {
+    const morceaux = [sujet.methode?.trim(), sujet.auteur?.trim()].filter(Boolean);
+    return morceaux.join(' · ') || null;
+  }
+
+  _resumeProprietes(sujet) {
+    const n = (sujet.proprietes ?? []).filter((p) => p.cle || p.valeur).length;
+    return n > 0 ? String(n) : null;
+  }
+
+  // The layer's name IS the title of its card. Two editable titles for one
+  // thing would be a trap: the card would say one name and the layer row
+  // another, and the label on the specimen a third.
+  _titre(calque) {
     const champ = document.createElement('input');
     champ.type = 'text';
     champ.className = 'champ fiche-titre';
-    if (this.surCalque) {
-      champ.value = calque?.nom ?? '';
-      champ.placeholder = 'Nom de l’entité';
-      champ.addEventListener('change', () => {
-        const valeur = champ.value.trim();
-        if (!valeur) { champ.value = calque?.nom ?? ''; return; }
-        this.surMutation('Renommer', () => {
-          const courant = this.doc.trouver(this.idCalque);
-          if (courant) courant.nom = valeur;
-        });
+    champ.value = calque?.nom ?? '';
+    champ.placeholder = 'Nom — c’est aussi l’étiquette dans la vue';
+    champ.addEventListener('change', () => {
+      const valeur = champ.value.trim();
+      if (!valeur) { champ.value = calque?.nom ?? ''; return; }
+      this.surMutation('Renommer', () => {
+        const courant = this.doc.trouver(this.idCalque);
+        if (courant) courant.nom = valeur;
       });
-    } else {
-      champ.value = sujet.titre || '';
-      champ.placeholder = 'Titre de l’annotation';
-      champ.addEventListener('change', () => {
-        const valeur = champ.value.trim();
-        this._muter('Titre de l’annotation', (e) => { e.titre = valeur; });
-      });
-    }
+    });
     champ.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') champ.blur();
@@ -190,59 +248,54 @@ export class Fiche {
 
   /* ------------------------------------------------------- qualification */
 
-  // What kind of statement this is, and how firmly it is made. Two controls,
-  // and the whole difference between a description and an examination.
+  // What kind of statement this is, and how firmly it is made — the whole
+  // difference between a description and an examination, in two menus on the
+  // header line.
+  //
+  // It was five pill buttons, a paragraph of explanation and a labelled select:
+  // three blocks and a quarter of the card, permanently, for two values that
+  // are set once and then read. Both keep their explanations as tooltips, and
+  // both stay one click away.
   _qualification(sujet) {
     const bloc = document.createElement('div');
     bloc.className = 'fiche-qualification';
 
-    const titre = document.createElement('span');
-    titre.className = 'group-title';
-    titre.textContent = 'Nature de l’énoncé';
-    bloc.appendChild(titre);
-
-    const choix = document.createElement('div');
-    choix.className = 'fiche-natures';
-    for (const [cle, { libelle, aide }] of Object.entries(NATURES)) {
-      const bouton = document.createElement('button');
-      bouton.type = 'button';
-      bouton.className = 'fiche-nature';
-      bouton.dataset.nature = cle;
-      bouton.textContent = libelle;
-      bouton.title = aide;
-      bouton.setAttribute('aria-pressed', String(sujet.nature === cle));
-      bouton.addEventListener('click', () => {
-        if (sujet.nature === cle) return;
-        this._muter('Nature de l’énoncé', (e) => { e.nature = cle; });
-      });
-      choix.appendChild(bouton);
+    const nature = document.createElement('select');
+    nature.className = 'fiche-select fiche-select-nature';
+    nature.dataset.nature = sujet.nature;
+    nature.setAttribute('aria-label', 'Nature de l’énoncé');
+    for (const [cle, { libelle }] of Object.entries(NATURES)) {
+      const option = document.createElement('option');
+      option.value = cle;
+      option.textContent = libelle;
+      option.selected = sujet.nature === cle;
+      nature.appendChild(option);
     }
-    bloc.appendChild(choix);
+    nature.title = `Nature de l’énoncé — ${NATURES[sujet.nature]?.aide ?? ''}`;
+    nature.addEventListener('change', () => {
+      const valeur = nature.value;
+      this._muter('Nature de l’énoncé', (e) => { e.nature = valeur; });
+    });
 
-    const note = document.createElement('p');
-    note.className = 'reglages-note';
-    note.textContent = NATURES[sujet.nature]?.aide ?? '';
-    bloc.appendChild(note);
-
-    const ligne = document.createElement('label');
-    ligne.className = 'fiche-champ-ligne';
-    ligne.append(Object.assign(document.createElement('span'), { textContent: 'Confiance' }));
-    const liste = document.createElement('select');
-    liste.className = 'champ';
+    const confiance = document.createElement('select');
+    confiance.className = 'fiche-select fiche-select-confiance';
+    confiance.dataset.confiance = sujet.confiance;
+    confiance.setAttribute('aria-label', 'Confiance');
     for (const [cle, { libelle }] of Object.entries(CONFIANCES)) {
       const option = document.createElement('option');
       option.value = cle;
       option.textContent = libelle;
       option.selected = sujet.confiance === cle;
-      liste.appendChild(option);
+      confiance.appendChild(option);
     }
-    liste.addEventListener('change', () => {
-      const valeur = liste.value;
+    confiance.title = 'Confiance — attachée à l’énoncé, pas à l’observateur : '
+      + '« probable » sur un constat est une chose légitime à écrire.';
+    confiance.addEventListener('change', () => {
+      const valeur = confiance.value;
       this._muter('Confiance', (e) => { e.confiance = valeur; });
     });
-    ligne.appendChild(liste);
-    bloc.appendChild(ligne);
 
+    bloc.append(nature, confiance);
     return bloc;
   }
 
@@ -252,11 +305,6 @@ export class Fiche {
   _conditions(sujet) {
     const bloc = document.createElement('div');
     bloc.className = 'fiche-conditions';
-
-    const titre = document.createElement('span');
-    titre.className = 'group-title';
-    titre.textContent = 'Conditions d’examen';
-    bloc.appendChild(titre);
 
     const idListe = 'fiche-methodes';
     if (!document.getElementById(idListe)) {
@@ -321,7 +369,7 @@ export class Fiche {
 
     const zone = document.createElement('textarea');
     zone.className = 'champ fiche-zone';
-    zone.rows = 7;
+    zone.rows = 6;
     zone.value = sujet.texte || '';
     zone.placeholder = '## Titre\n\nTexte, **gras**, *italique*, - listes, [liens](https://…)';
     zone.addEventListener('keydown', (e) => {
@@ -333,7 +381,7 @@ export class Fiche {
       this.editionTexte = false;
       const courant = this._sujet();
       if (courant && valeur !== (courant.texte || '')) {
-        this._muter('Texte de l’annotation', (e) => { e.texte = valeur; });
+        this._muter('Texte de la fiche', (e) => { e.texte = valeur; });
       } else {
         this.rendre();
       }
@@ -417,11 +465,6 @@ export class Fiche {
   _medias(sujet) {
     const bloc = document.createElement('div');
     bloc.className = 'fiche-medias';
-
-    const titre = document.createElement('span');
-    titre.className = 'group-title';
-    titre.textContent = 'Médias';
-    bloc.appendChild(titre);
 
     const grille = document.createElement('div');
     grille.className = 'medias-grille';
@@ -533,15 +576,12 @@ export class Fiche {
     });
   }
 
-  // Removed from the card, and from the document when nothing else uses it —
-  // which now means scanning layer cards as well as pins.
+  // Removed from the card, and from the document when nothing else uses it.
   _retirerMedia(id) {
     this._muter('Retirer le média', (sujet) => {
       sujet.medias = (sujet.medias || []).filter((m) => m !== id);
-      const encoreUtilise = this.doc.aplatir().some(({ calque }) => (
-        (calque.fiche?.medias || []).includes(id)
-        || calque.donnees?.elements?.some((e) => (e.medias || []).includes(id))
-      ));
+      const encoreUtilise = this.doc.aplatir()
+        .some(({ calque }) => (calque.fiche?.medias || []).includes(id));
       if (!encoreUtilise) this.doc.medias = this.doc.medias.filter((m) => m.id !== id);
     });
   }
@@ -554,11 +594,6 @@ export class Fiche {
   _proprietes(sujet) {
     const bloc = document.createElement('div');
     bloc.className = 'fiche-proprietes';
-
-    const titre = document.createElement('span');
-    titre.className = 'group-title';
-    titre.textContent = 'Propriétés';
-    bloc.appendChild(titre);
 
     const vocabulaire = this.doc.vocabulaireProprietes();
     const idListe = 'fiche-cles-proprietes';
@@ -635,6 +670,41 @@ export class Fiche {
     return bloc;
   }
 
+  /* ------------------------------------------------------------ affichage */
+
+  // Whether this layer says its name on the specimen. The same switch sits on
+  // the layer row; it is repeated here because the moment you decide a zone
+  // does not deserve a name in the view is the moment you are describing it.
+  _affichage(calque) {
+    const bloc = document.createElement('div');
+    bloc.className = 'fiche-affichage';
+
+    const ligne = document.createElement('label');
+    ligne.className = 'case';
+    const champ = document.createElement('input');
+    champ.type = 'checkbox';
+    champ.checked = calque.etiquette !== false;
+    champ.addEventListener('change', () => {
+      const valeur = champ.checked;
+      this.surMutation(valeur ? 'Afficher l’étiquette' : 'Masquer l’étiquette', () => {
+        const courant = this.doc.trouver(this.idCalque);
+        if (courant) courant.etiquette = valeur;
+      });
+    });
+    ligne.append(champ, document.createTextNode(calque.enfants
+      ? 'Étiquettes de ce groupe dans la vue'
+      : 'Étiquette dans la vue'));
+
+    const note = document.createElement('p');
+    note.className = 'reglages-note';
+    note.textContent = calque.enfants
+      ? 'Décoché, plus rien de ce groupe ne se nomme dans la vue.'
+      : 'L’étiquette porte le nom ci-dessus, à l’endroit exact que ce calque désigne.';
+
+    bloc.append(ligne, note);
+    return bloc;
+  }
+
   /* -------------------------------------------------------------- traces */
 
   // Who wrote it and when it last changed. Small, and the difference between a
@@ -656,48 +726,43 @@ export class Fiche {
     return bloc;
   }
 
-  _actions() {
+  _actions(calque) {
     const barre = document.createElement('div');
     barre.className = 'barre-calques fiche-actions';
 
-    if (!this.surCalque) {
+    if (!calque.enfants) {
       const centrer = document.createElement('button');
       centrer.type = 'button';
       centrer.textContent = 'Centrer la vue';
-      centrer.addEventListener('click', () => this.surCentrage?.(this._epingleBrute()));
+      centrer.addEventListener('click', () => this.surCentrage?.(calque));
       barre.appendChild(centrer);
-
-      const supprimer = document.createElement('button');
-      supprimer.type = 'button';
-      supprimer.className = 'action-dangereuse';
-      supprimer.textContent = 'Supprimer';
-      supprimer.addEventListener('click', () => this.surSuppression?.(this.idEpingle, this.idCalque));
-      barre.appendChild(supprimer);
-      return barre;
     }
 
     // Removing a layer's card must not remove the layer: the paint, the region
-    // and the measurements underneath are the expensive part.
+    // and the measurements underneath are the expensive part. Deleting the
+    // layer itself is a separate button, and it says so.
     const retirer = document.createElement('button');
     retirer.type = 'button';
-    retirer.className = 'action-dangereuse';
     retirer.textContent = 'Retirer la fiche';
     retirer.title = 'Supprime la description, jamais le calque ni son contenu';
     retirer.addEventListener('click', () => {
       if (!window.confirm('Retirer la fiche de ce calque ? Le calque et son contenu sont conservés.')) return;
       this.surMutation('Retirer la fiche', () => {
-        const calque = this.doc.trouver(this.idCalque);
-        if (calque) calque.fiche = null;
+        const courant = this.doc.trouver(this.idCalque);
+        if (courant) courant.fiche = null;
       });
       this.surFermeture?.();
     });
     barre.appendChild(retirer);
-    return barre;
-  }
 
-  // The live pin, for the caller that needs its coordinates rather than its text.
-  _epingleBrute() {
-    const calque = this.idCalque && this.doc.trouver(this.idCalque);
-    return calque?.donnees?.elements.find((e) => e.id === this.idEpingle) ?? null;
+    const supprimer = document.createElement('button');
+    supprimer.type = 'button';
+    supprimer.className = 'action-dangereuse';
+    supprimer.textContent = 'Supprimer';
+    supprimer.title = 'Supprime le calque et tout son contenu';
+    supprimer.addEventListener('click', () => this.surSuppression?.(this.idCalque));
+    barre.appendChild(supprimer);
+
+    return barre;
   }
 }

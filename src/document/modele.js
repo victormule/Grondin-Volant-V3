@@ -18,13 +18,87 @@
 // whenever the geometry is moved again.
 export const REPERE = 'socle-net-2026-08';
 
+// Version 2 is the one where an annotation became a layer of its own, and where
+// every element says what it is instead of relying on its layer's type to say
+// it. `migrer` below walks a version 1 document up to it, once, on load.
+export const VERSION = 3;
+
+// The project record: what the document IS, as opposed to what it observes.
+//
+// A condition report is worth exactly what its header is worth. « Fissure du
+// rayon III, probable » means nothing on its own — it means something once you
+// know which specimen, held where, examined by whom, when, by what method and
+// to what end. That is the difference between an observation and a record, and
+// it is the part that is still true in twenty years when nobody involved is
+// reachable.
+//
+// The fields below are grouped by the question a reader asks, not by type:
+// what the thing is, why it was looked at, who looked, when and where, and how.
+// The « how » is the one people skip and the one that decides whether a figure
+// can be trusted at all — a length is a claim about a scale, and a scale is a
+// claim about a method.
+export function creerProjet() {
+  return {
+    titre: '',
+    objectif: '',
+    commanditaire: '',
+    objet: {
+      designation: '',
+      taxon: '',
+      inventaire: '',
+      materiaux: '',
+      dimensions: '',
+      conservation: '',
+    },
+    intervenants: [],
+    campagne: { lieu: '', debut: '', fin: '' },
+    methode: { technique: '', materiel: '', logiciels: '', echelle: '' },
+    references: '',
+    cree: new Date().toISOString(),
+    modifie: null,
+  };
+}
+
+// Whether anything has actually been written. Used to nag gently rather than
+// to block: a document with no header is legitimate while you work, and a
+// problem the moment you hand it to someone else.
+export function projetRenseigne(projet) {
+  if (!projet) return false;
+  const plein = (valeur) => String(valeur ?? '').trim().length > 0;
+  return plein(projet.titre) || plein(projet.objectif) || plein(projet.commanditaire)
+    || plein(projet.references)
+    || Object.values(projet.objet ?? {}).some(plein)
+    || Object.values(projet.campagne ?? {}).some(plein)
+    || Object.values(projet.methode ?? {}).some(plein)
+    || (projet.intervenants ?? []).some((p) => plein(p.nom));
+}
+
+// What a single piece of content IS, independently of the layer holding it.
+//
+// Layers hold one kind each — that is what makes them readable — but knowing
+// the kind from the element rather than from the layer is what lets a layer be
+// described, measured and drawn by asking what is actually in it. A layer whose
+// type says « peinture » and which holds nothing is not a paint layer in any
+// useful sense, and this is the field that lets everything downstream say so.
+// These used to carry an `icone` each — ◍ ⬢ ↔ ◉ — which is how the panel, the
+// card and the labels drew a layer's kind. Unicode geometry does not survive
+// eleven pixels: ◍ and ◉ are the same pierced disc there. The marks are drawn
+// shapes now and live in ../ui/glyphes.js; what a kind is CALLED still belongs
+// here, next to what it means.
+export const GENRES = {
+  trace: { libelle: 'Peinture', type: 'peinture' },
+  region: { libelle: 'Région', type: 'region' },
+  mesure: { libelle: 'Mesure', type: 'mesure' },
+  epingle: { libelle: 'Annotation', type: 'annotation' },
+};
+
 export const TYPES_CALQUE = {
-  groupe: { libelle: 'Groupe', icone: '▤', contenant: true },
-  annotation: { libelle: 'Annotations', icone: '◉' },
-  peinture: { libelle: 'Peinture', icone: '◍' },
-  region: { libelle: 'Région', icone: '⬢' },
-  contour: { libelle: 'Contour', icone: '◠' },
-  mesure: { libelle: 'Mesure', icone: '↔' },
+  groupe: { libelle: 'Groupe', contenant: true },
+  annotation: { libelle: 'Annotation', genre: 'epingle' },
+  peinture: { libelle: 'Peinture', genre: 'trace' },
+  region: { libelle: 'Région', genre: 'region' },
+  mesure: { libelle: 'Mesure', genre: 'mesure' },
+  contour: { libelle: 'Contour', genre: 'region' },
 };
 
 export const FUSIONS = {
@@ -74,13 +148,17 @@ export const METHODES = [
   'Examen organoleptique',
 ];
 
-// The descriptive payload, carried both by a pin and by a layer.
+/* ------------------------------------------------------------------ fiches */
+
+// The descriptive payload of a layer.
 //
-// A pin has a title of its own; a layer is titled by its name in the panel,
-// so `titre` stays empty there and the card edits the name instead.
-export function creerFiche(titre = '') {
+// It used to be carried both by a pin and by a layer, which is precisely the
+// confusion this version removes: a pin IS a layer now, so there is one card
+// per described thing and it always hangs off the layer. The layer's name is
+// its title — a card with a title of its own would let the panel say one name
+// and the card another.
+export function creerFiche() {
   return {
-    titre,
     texte: '',
     nature: 'constat',
     confiance: 'certain',
@@ -111,8 +189,9 @@ export function normaliserFiche(fiche) {
 }
 
 // Whether a record carries anything a reader would want to see. Used to decide
-// if a layer deserves a « described » marker in the panel: an empty card
-// created by a stray click must not decorate the row for ever.
+// whether a layer deserves a label in the view and a « described » marker in
+// the panel: an empty card created by a stray click must not decorate either
+// for ever.
 export function ficheRenseignee(fiche) {
   if (!fiche) return false;
   return Boolean(fiche.texte?.trim() || fiche.auteur?.trim() || fiche.methode?.trim()
@@ -120,11 +199,61 @@ export function ficheRenseignee(fiche) {
     || (fiche.nature && fiche.nature !== 'constat'));
 }
 
+/* ---------------------------------------------------------------- éléments */
+
+// What an element is, read from the element itself. Documents written before
+// version 2 have no `genre`, and their content is recognisable without one:
+// dabs, faces, a polyline, a point on the surface. Inferring rather than
+// requiring means a file that skipped the migration still draws correctly.
+export function genreElement(element) {
+  if (!element) return null;
+  if (element.genre && element.genre in GENRES) return element.genre;
+  if (Array.isArray(element.empreintes)) return 'trace';
+  if (Array.isArray(element.faces)) return 'region';
+  if (Array.isArray(element.points)) return 'mesure';
+  if (Array.isArray(element.position)) return 'epingle';
+  return null;
+}
+
+export function elementsDuGenre(calque, genre) {
+  const elements = calque?.donnees?.elements;
+  if (!elements) return [];
+  return elements.filter((element) => genreElement(element) === genre);
+}
+
+export function calquePorte(calque, genre) {
+  const elements = calque?.donnees?.elements;
+  if (!elements) return false;
+  return elements.some((element) => genreElement(element) === genre);
+}
+
+// Every kind of content a layer actually holds, in the order it first appears.
+// An empty layer returns nothing, which is what makes « this layer draws
+// something » a question with an answer.
+export function genresDuCalque(calque) {
+  const vus = [];
+  for (const element of calque?.donnees?.elements ?? []) {
+    const genre = genreElement(element);
+    if (genre && !vus.includes(genre)) vus.push(genre);
+  }
+  return vus;
+}
+
+// What a layer should be called and iconed. Its content answers first: a layer
+// is what it holds, and its declared type only speaks for one that is still
+// empty — the moment between a tool being aimed and its first gesture.
+export function typeAffiche(calque) {
+  if (calque.type === 'groupe') return TYPES_CALQUE.groupe;
+  const genres = genresDuCalque(calque);
+  if (genres.length >= 1) return GENRES[genres[0]];
+  return TYPES_CALQUE[calque.type] ?? TYPES_CALQUE.annotation;
+}
+
 const COULEURS = ['#c9553d', '#d99a35', '#4f9066', '#3d7ab8', '#8360b8', '#b8508a'];
 
 let compteurCouleur = 0;
 
-function identifiant() {
+export function identifiant() {
   if (crypto.randomUUID) return crypto.randomUUID();
   return 'c-' + Math.random().toString(36).slice(2, 11);
 }
@@ -142,6 +271,11 @@ export function creerCalque(type, nom) {
     fusion: 'normal',
     couleur: COULEURS[compteurCouleur++ % COULEURS.length],
     portee: 'toutes',
+    // Whether this layer speaks for itself in the view. Every kind of layer can
+    // carry a label now, so every kind needs a way to be quiet: a document with
+    // forty measured zones is unreadable if all forty insist on a name.
+    etiquette: true,
+    fiche: null,
     enfants: modele.contenant ? [] : null,
     donnees: modele.contenant ? null : { elements: [] },
   };
@@ -154,6 +288,7 @@ export function creerCalque(type, nom) {
 export function creerMesure(points, mode = 'droite', session = null) {
   return {
     id: identifiant(),
+    genre: 'mesure',
     points: points.map((p) => [p.x, p.y, p.z]),
     mode,
     titre: '',
@@ -165,23 +300,149 @@ export function creerMesure(points, mode = 'droite', session = null) {
 // A pin lives in the shared frame, in metres — not in the frame of whichever
 // session was on screen when it was placed. `session` only records where it
 // came from.
+//
+// It carries geometry and nothing else. What is said about it lives in the card
+// of the layer that holds it, because that layer IS the annotation: one pin,
+// one row in the panel, one card. The old shape — a pin with its own title,
+// text, nature and media, nested inside a layer that also had a name — meant
+// two titles for one thing and a panel in which « Annotations » and « an
+// annotation » were different rows at different depths.
 export function creerEpingle(position, normale, session = null) {
   return {
     id: identifiant(),
+    genre: 'epingle',
     position: [position.x, position.y, position.z],
     normale: [normale.x, normale.y, normale.z],
-    ...creerFiche(),
     session,
   };
 }
 
+/* --------------------------------------------------------------- migration */
+
+// The fields a version 1 pin carried inline, lifted out into a card.
+function ficheDepuisEpingle(epingle) {
+  const fiche = normaliserFiche({
+    texte: epingle.texte,
+    nature: epingle.nature,
+    confiance: epingle.confiance,
+    methode: epingle.methode,
+    auteur: epingle.auteur,
+    medias: epingle.medias,
+    proprietes: epingle.proprietes,
+    vue: epingle.vue,
+    cree: epingle.cree,
+    modifie: epingle.modifie,
+  });
+  return ficheRenseignee(fiche) || epingle.titre?.trim() ? fiche : null;
+}
+
+function epingleNue(epingle) {
+  return {
+    id: epingle.id ?? identifiant(),
+    genre: 'epingle',
+    position: epingle.position,
+    normale: epingle.normale,
+    session: epingle.session ?? null,
+  };
+}
+
+function calqueDepuisEpingle(epingle, modele, nom) {
+  const calque = creerCalque('annotation', nom);
+  calque.id = identifiant();
+  calque.couleur = modele.couleur;
+  calque.visible = modele.visible !== false;
+  calque.verrouille = modele.verrouille === true;
+  calque.opacite = modele.opacite ?? 1;
+  calque.portee = modele.portee ?? 'toutes';
+  calque.fiche = ficheDepuisEpingle(epingle);
+  calque.donnees.elements = [epingleNue(epingle)];
+  return calque;
+}
+
+// One layer per annotation, and every element told what it is.
+//
+// Returns the replacement for `calque`, or null when it holds nothing at all —
+// an empty annotation layer is exactly the clutter this version set out to
+// remove, and it cannot be recreated by hand any more.
+function migrerCalque(calque) {
+  calque.etiquette = calque.etiquette !== false;
+  calque.fiche = calque.fiche ?? null;
+
+  if (calque.enfants) {
+    calque.enfants = calque.enfants.map(migrerCalque).filter(Boolean);
+    return calque;
+  }
+
+  const elements = calque.donnees?.elements ?? [];
+  for (const element of elements) {
+    const genre = genreElement(element);
+    if (genre) element.genre = genre;
+  }
+
+  if (calque.type !== 'annotation') return calque;
+
+  const epingles = elements.filter((element) => genreElement(element) === 'epingle');
+  if (epingles.length === 0) return ficheRenseignee(calque.fiche) ? calque : null;
+
+  if (epingles.length === 1) {
+    const epingle = epingles[0];
+    const titre = String(epingle.titre ?? '').trim();
+    if (titre) calque.nom = titre;
+    calque.fiche = calque.fiche ?? ficheDepuisEpingle(epingle);
+    calque.donnees.elements = [epingleNue(epingle)];
+    return calque;
+  }
+
+  // Several pins under one name: the name was the entity, the pins were its
+  // facets. That is what a group says, so it becomes one — and each pin becomes
+  // the annotation it always was.
+  const groupe = creerCalque('groupe', calque.nom);
+  groupe.id = calque.id;
+  groupe.couleur = calque.couleur;
+  groupe.visible = calque.visible !== false;
+  groupe.verrouille = calque.verrouille === true;
+  groupe.opacite = calque.opacite ?? 1;
+  groupe.portee = calque.portee ?? 'toutes';
+  groupe.fiche = calque.fiche ?? null;
+  groupe.enfants = epingles.map((epingle, index) => calqueDepuisEpingle(
+    epingle, calque, String(epingle.titre ?? '').trim() || `Annotation ${index + 1}`,
+  ));
+  return groupe;
+}
+
+export function migrer(donnees) {
+  if (!donnees) return donnees;
+  const version = donnees.version ?? 1;
+  if (version >= VERSION) return donnees;
+
+  // v1 → v2 : one annotation per layer, and a genre on every element. Gated on
+  // the version rather than run unconditionally — replaying a layer conversion
+  // on a document that has already had it is at best wasted work and at worst
+  // a second pass over structures the first pass reshaped.
+  if (version < 2) {
+    const racine = donnees.racine ?? { id: 'racine', type: 'groupe', enfants: [] };
+    racine.enfants = (racine.enfants ?? []).map(migrerCalque).filter(Boolean);
+    donnees.racine = racine;
+  }
+
+  // v2 → v3 : the project record. Nothing to convert — a document written
+  // before there was a header simply gets an empty one, which the constructor
+  // fills in from `creerProjet()`.
+  donnees.version = VERSION;
+  return donnees;
+}
+
+/* ------------------------------------------------------------------ le doc */
+
 export class DocumentAnnotation {
   constructor(donnees) {
-    this.version = donnees?.version ?? 1;
-    this.repere = donnees?.repere ?? null;
-    this.sessionReference = donnees?.sessionReference ?? null;
-    this.racine = donnees?.racine ?? { id: 'racine', type: 'groupe', enfants: [] };
-    this.medias = donnees?.medias ?? [];
+    const migre = migrer(donnees);
+    this.version = migre?.version ?? VERSION;
+    this.repere = migre?.repere ?? null;
+    this.sessionReference = migre?.sessionReference ?? null;
+    this.racine = migre?.racine ?? { id: 'racine', type: 'groupe', enfants: [] };
+    this.medias = migre?.medias ?? [];
+    this.projet = { ...creerProjet(), ...(migre?.projet ?? {}) };
   }
 
   // An empty document is in whatever frame the build is in, so it always
@@ -193,7 +454,7 @@ export class DocumentAnnotation {
   }
 
   static vide(sessionReference) {
-    return new DocumentAnnotation({ sessionReference });
+    return new DocumentAnnotation({ sessionReference, version: VERSION });
   }
 
   /* ------------------------------------------------------------ parcours */
@@ -327,6 +588,18 @@ export class DocumentAnnotation {
     return opacite;
   }
 
+  // Whether a layer is allowed to speak in the view. Switching a group off
+  // silences everything under it, the same way hiding it does: a group is the
+  // entity, and an entity that is not being shown has nothing to say.
+  etiquetteEffective(id) {
+    let calque = this.trouver(id);
+    while (calque && calque !== this.racine) {
+      if (calque.etiquette === false) return false;
+      calque = this.parentDe(calque.id);
+    }
+    return true;
+  }
+
   /* --------------------------------------------------------------- fiches */
 
   // The chain from the root down to a layer, the layer itself last.
@@ -338,6 +611,17 @@ export class DocumentAnnotation {
       calque = this.parentDe(calque.id);
     }
     return suite;
+  }
+
+  // The outermost group a layer sits in — the top of the chain, not the group
+  // immediately above it. A label three levels deep belongs, to a reader, to
+  // the thing the whole branch is about; carrying the colour of the innermost
+  // group instead meant two sibling labels of one entity wore different dots.
+  groupeExterieur(id) {
+    const chemin = this.chemin(id);
+    const premier = chemin[0];
+    if (!premier || premier.id === id || premier.type !== 'groupe') return null;
+    return premier;
   }
 
   // The entity a layer belongs to: the nearest ancestor that has been given a
@@ -360,18 +644,14 @@ export class DocumentAnnotation {
   // anything.
   vocabulaireProprietes() {
     const cles = new Map();
-    const visiter = (fiche) => {
-      for (const propriete of fiche?.proprietes ?? []) {
+    for (const { calque } of this.aplatir()) {
+      for (const propriete of calque.fiche?.proprietes ?? []) {
         const cle = String(propriete.cle ?? '').trim();
         if (!cle) continue;
         const unite = String(propriete.unite ?? '').trim();
         if (!cles.has(cle)) cles.set(cle, unite);
         else if (unite && !cles.get(cle)) cles.set(cle, unite);
       }
-    };
-    for (const { calque } of this.aplatir()) {
-      visiter(calque.fiche);
-      for (const element of calque.donnees?.elements ?? []) visiter(element);
     }
     return cles;
   }
@@ -392,13 +672,14 @@ export class DocumentAnnotation {
 
   serialiser() {
     return {
-      version: this.version,
+      version: VERSION,
       // Stamped, never copied: whatever was loaded, what is being written now
       // was authored against the geometry this build ships.
       repere: REPERE,
       sessionReference: this.sessionReference,
       racine: structuredClone(this.racine),
       medias: structuredClone(this.medias),
+      projet: structuredClone(this.projet),
     };
   }
 

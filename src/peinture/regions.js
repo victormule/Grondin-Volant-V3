@@ -12,6 +12,12 @@
 import * as THREE from 'three';
 import { AnalyseModele, GrilleFaces } from './maillage.js';
 import { frontiere, geometrieSelection, lisserSelection, transferer } from './selection.js';
+import { elementsDuGenre } from '../document/modele.js';
+
+// How closely a face must agree with a region's dominant facing to be allowed
+// to carry its label. Generous — a zone curving over a flank still counts as
+// facing one way — but enough to rule out the folds and the underside.
+const ACCORD_ANCRAGE = 0.35;
 
 export class GestionnaireRegions {
   constructor(config) {
@@ -80,16 +86,19 @@ export class GestionnaireRegions {
     return this._entree(cle) ?? null;
   }
 
-  // The face set of a layer, expressed on one capture's mesh.
+  // The face set of a layer, expressed on one capture's mesh. Only elements
+  // that are regions are considered — a layer's array can also hold strokes,
+  // pins or measurements, and none of those has faces.
   facesPour(calque, cle = null) {
     const entree = this._entree(cle);
     if (!entree) return new Set();
+    const elements = elementsDuGenre(calque, 'region');
     const identifiant = `${calque.id}:${entree.cle}`;
     const cache = this.cache.get(identifiant);
     if (cache?.faces) return cache.faces;
 
     const faces = new Set();
-    for (const element of calque.donnees?.elements ?? []) {
+    for (const element of elements) {
       const memeCapture = !element.session || element.session === entree.idSession;
       if (memeCapture) {
         for (const f of element.faces) faces.add(f);
@@ -115,7 +124,7 @@ export class GestionnaireRegions {
     let apres = 0;
     let elements = 0;
 
-    for (const element of calque?.donnees?.elements ?? []) {
+    for (const element of elementsDuGenre(calque, 'region')) {
       if (!Array.isArray(element.faces) || element.faces.length === 0) continue;
       const source = element.session
         ? this.parSession.get(element.session)
@@ -154,6 +163,91 @@ export class GestionnaireRegions {
     stocke.geometrie = geometrie;
     this.cache.set(identifiant, stocke);
     return geometrie;
+  }
+
+  // Where a region's label belongs: the centre of its area on this capture,
+  // weighted by face area so a thin tail cannot drag the name off the body of
+  // the zone.
+  centre(calque, cle = null) {
+    const entree = this._entree(cle);
+    if (!entree) return null;
+    const faces = this.facesPour(calque, entree.cle);
+    if (faces.size === 0) return null;
+    const { centres, aires, normales } = entree.analyse;
+    let x = 0;
+    let y = 0;
+    let z = 0;
+    let nx = 0;
+    let ny = 0;
+    let nz = 0;
+    let poids = 0;
+    for (const face of faces) {
+      const aire = aires[face] || 1e-9;
+      x += centres[face * 3] * aire;
+      y += centres[face * 3 + 1] * aire;
+      z += centres[face * 3 + 2] * aire;
+      nx += normales[face * 3] * aire;
+      ny += normales[face * 3 + 1] * aire;
+      nz += normales[face * 3 + 2] * aire;
+      poids += aire;
+    }
+    if (poids <= 0) return null;
+
+    // The weighted centroid is the natural centre of a region — and on anything
+    // curved it lies INSIDE the shell. Hung there, a label is occluded by the
+    // specimen's own surface from most angles, so it blinked out as soon as the
+    // model turned. The centroid therefore only ELECTS a face; what comes back
+    // is that face's own centre and normal, a point genuinely on the surface
+    // that can be tested exactly like a pin's.
+    //
+    // The election also has to respect which way the zone faces. Taking the
+    // face nearest the centroid outright picks, on a region that wraps around a
+    // flank, whichever fold happens to sit closest to the middle of the volume
+    // — measured here, a face pointing almost straight down, so the label hid
+    // itself at every angle a reader would ever use. The region's area-weighted
+    // normal gives its dominant facing; the anchor is chosen among the faces
+    // that share it, and only falls back to the whole set if none does.
+    const cx = x / poids;
+    const cy = y / poids;
+    const cz = z / poids;
+
+    const dominante = new THREE.Vector3(nx, ny, nz);
+    const orientee = dominante.lengthSq() > 1e-12;
+    if (orientee) dominante.normalize();
+
+    const elire = (accordMinimum) => {
+      let elue = -1;
+      let ecartMin = Infinity;
+      for (const face of faces) {
+        if (accordMinimum !== null) {
+          const accord = dominante.x * normales[face * 3]
+            + dominante.y * normales[face * 3 + 1]
+            + dominante.z * normales[face * 3 + 2];
+          if (accord < accordMinimum) continue;
+        }
+        const dx = centres[face * 3] - cx;
+        const dy = centres[face * 3 + 1] - cy;
+        const dz = centres[face * 3 + 2] - cz;
+        const ecart = dx * dx + dy * dy + dz * dz;
+        if (ecart < ecartMin) { ecartMin = ecart; elue = face; }
+      }
+      return elue;
+    };
+
+    let elue = orientee ? elire(ACCORD_ANCRAGE) : -1;
+    if (elue < 0) elue = elire(null);
+    if (elue < 0) return null;
+
+    // The stored normals are already unit vectors: `aires` was taken from the
+    // cross product's length before it was normalised.
+    return {
+      position: new THREE.Vector3(
+        centres[elue * 3], centres[elue * 3 + 1], centres[elue * 3 + 2],
+      ),
+      normale: new THREE.Vector3(
+        normales[elue * 3], normales[elue * 3 + 1], normales[elue * 3 + 2],
+      ),
+    };
   }
 
   segmentsContour(calque, cle = null) {

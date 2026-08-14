@@ -37,6 +37,10 @@ export const OUTILS = [
 ];
 
 const DELAI_FERMETURE = 220;
+// Hover intent. Sweeping the pointer down the rail used to fling every tool's
+// settings open in turn; the panel now waits to be sure you meant this tool,
+// which is also the window in which its name gets to be read.
+const DELAI_OUVERTURE = 320;
 
 export class BarreOutils {
   constructor(conteneur, options = {}) {
@@ -75,10 +79,14 @@ export class BarreOutils {
       });
       bouton.addEventListener('pointerenter', (e) => {
         if (e.pointerType === 'touch') return;
-        this.montrerPanneau(outil.nom, bouton);
+        // A panel already open means the pointer is travelling along the rail
+        // with intent: swap immediately rather than making it wait again.
+        if (this.survole) this.montrerPanneau(outil.nom, bouton);
+        else this.planifierOuverture(outil.nom, bouton);
       });
       bouton.addEventListener('pointerleave', (e) => {
         if (e.pointerType === 'touch') return;
+        clearTimeout(this._minuteurOuverture);
         this.planifierFermeture();
       });
       bouton.addEventListener('focus', () => this.montrerPanneau(outil.nom, bouton));
@@ -132,19 +140,37 @@ export class BarreOutils {
 
   /* ------------------------------------------------------------ panneaux */
 
+  planifierOuverture(nom, bouton) {
+    clearTimeout(this._minuteurOuverture);
+    if (!this.panneaux[nom]) return;
+    this._minuteurOuverture = setTimeout(
+      () => this.montrerPanneau(nom, bouton), DELAI_OUVERTURE,
+    );
+  }
+
   montrerPanneau(nom, bouton, epingler = false) {
     clearTimeout(this._minuteur);
+    clearTimeout(this._minuteurOuverture);
     if (this.survole && this.panneaux[this.survole] !== this.panneaux[nom]) {
       this._masquer(this.survole);
     }
 
     const panneau = this.panneaux[nom];
-    if (!panneau) { this.survole = null; this.epingle = false; return; }
+    if (!panneau) { this.survole = null; this.epingle = false; this._marquer(); return; }
 
     panneau.hidden = false;
     this.survole = nom;
     this.epingle = epingler;
     this._placer(panneau, bouton);
+    this._marquer();
+  }
+
+  // The open panel names its own tool, so the tooltip would only repeat it and
+  // sit on top of it. It marks which button that is; CSS silences that one.
+  _marquer() {
+    for (const [nom, bouton] of this.boutons) {
+      bouton.toggleAttribute('data-panneau-ouvert', nom === this.survole);
+    }
   }
 
   // Vertically centred on its tool, then nudged back inside the window. On a
@@ -174,9 +200,11 @@ export class BarreOutils {
 
   fermerPanneau() {
     clearTimeout(this._minuteur);
+    clearTimeout(this._minuteurOuverture);
     if (this.survole) this._masquer(this.survole);
     this.survole = null;
     this.epingle = false;
+    this._marquer();
   }
 
   _masquer(nom) {

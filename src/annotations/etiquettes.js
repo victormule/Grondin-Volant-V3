@@ -1,10 +1,27 @@
-// Screen-space annotation labels connected to their exact 3D anchor.
+// Screen-space labels connected to their exact 3D anchor.
 //
-// The dot stays on the specimen. Labels are laid out around the projected
-// body, with dotted leaders, so a dense annotation set remains readable
-// without turning the fish itself into a wall of text.
+// ONE LABEL PER LAYER, whatever the layer holds. A pin, a painted zone, a
+// region and a measurement are four ways of pointing at a thing on the
+// specimen; they used to be labelled by four unrelated pieces of code, of which
+// only one — the pins — actually put a name on screen. So a painted lesion was
+// a coloured smear with its name locked away in a panel, and the panel was the
+// only place two of them could be told apart.
+//
+// The anchor stays on the specimen. Labels are laid out around the projected
+// body, with dotted leaders, so a dense annotation set remains readable without
+// turning the fish itself into a wall of text.
+//
+// What a label does NOT do is say what kind of layer it belongs to in words.
+// Every label looks the same — same shape, same weight, same leader — because
+// they are all the same act, naming a thing. The one discreet difference is a
+// small glyph, and it is there for the reader who wonders how a figure was
+// obtained rather than for the reader who just wants the name.
 
 import * as THREE from 'three';
+import {
+  GENRES, TYPES_CALQUE, NATURES, CONFIANCES, genresDuCalque, elementsDuGenre, ficheRenseignee,
+} from '../document/modele.js';
+import { tracesSilhouette } from '../ui/glyphes.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const BUDGET_RAYONS = 3;
@@ -12,9 +29,20 @@ const MARGE_ECRAN = 10;
 const ECART_MODELE = 14;
 const ECART_ETIQUETTES = 6;
 const DESCRIPTION_MAX = 180;
+// Cf. regions.js : la même exigence, pour la même raison. Un tracé qui déborde
+// sur l'autre face ne doit pas emmener son étiquette avec lui.
+const ACCORD_ANCRAGE = 0.35;
+// Combien de valeurs mesurées une étiquette dépliée affiche avant de compter
+// le reste. Au-delà, elle cesse d'être une étiquette : c'est la fiche.
+const PROPRIETES_ETIQUETTE = 3;
 const INTERVALLE_DISPOSITION = 85;
 const HYSTERESE_COTE = 0.7;
 const COTES = ['gauche', 'droite', 'haut', 'bas'];
+
+// Dabs are sampled rather than summed: a long stroke can carry tens of
+// thousands, and the centre of a cloud of points is not a figure that needs
+// every one of them.
+const ECHANTILLON_EMPREINTES = 240;
 
 function borner(valeur, min, max) {
   if (max < min) return min;
@@ -59,16 +87,23 @@ function resumer(markdown) {
   if (texte.length <= DESCRIPTION_MAX) return texte;
   const coupe = texte.slice(0, DESCRIPTION_MAX + 1);
   const fin = coupe.lastIndexOf(' ');
-  return `${coupe.slice(0, fin > DESCRIPTION_MAX * 0.65 ? fin : DESCRIPTION_MAX).trim()}\u2026`;
+  return `${coupe.slice(0, fin > DESCRIPTION_MAX * 0.65 ? fin : DESCRIPTION_MAX).trim()}…`;
 }
 
-export class CoucheEpingles {
+export class CoucheEtiquettes {
   constructor(conteneur, scene3d, pointeur, options = {}) {
     this.conteneur = conteneur;
     this.scene3d = scene3d;
     this.pointeur = pointeur;
     this.doc = options.document;
     this.surSelection = options.surSelection;
+    // Set by the application: where a layer's regions sit on the capture
+    // currently on screen. Region faces are indices into a mesh this file has
+    // no business knowing about.
+    this.ancrageRegion = options.ancrageRegion ?? null;
+    // The media library, so an unfolded label can show what it is talking
+    // about. Optional: without it labels simply stay wordy.
+    this.medias = options.medias ?? null;
 
     this.selection = null;
     this.sessionActive = null;
@@ -82,16 +117,17 @@ export class CoucheEpingles {
     this._position = new THREE.Vector3();
     this._normale = new THREE.Vector3();
     this._versCamera = new THREE.Vector3();
+    this._projection = new THREE.Vector3();
 
     window.addEventListener('resize', () => this._planifierDisposition());
     for (const panneau of document.querySelectorAll('.panel')) {
       panneau.addEventListener('transitionend', () => this._planifierDisposition());
     }
     this.observateurInterface = new MutationObserver(() => this._planifierDisposition());
-    for (const reglages of document.querySelectorAll('.reglages-outil')) {
+    for (const reglages of document.querySelectorAll('.reglages-outil, .fiche-flottante')) {
       this.observateurInterface.observe(reglages, {
         attributes: true,
-        attributeFilter: ['hidden'],
+        attributeFilter: ['hidden', 'class'],
       });
     }
   }
@@ -109,17 +145,246 @@ export class CoucheEpingles {
   selectionner(id) {
     this.selection = id;
     for (const entree of this.entrees) {
-      const selectionnee = entree.epingle.id === id;
+      const selectionnee = entree.calque.id === id;
       entree.point.classList.toggle('selectionnee', selectionnee);
       entree.etiquette.classList.toggle('selectionnee', selectionnee);
+      for (const secondaire of entree.pointsSecondaires) {
+        secondaire.element.classList.toggle('selectionnee', selectionnee);
+      }
     }
   }
+
+  /* ----------------------------------------------------------- l'ancrage */
+
+  // Where a layer's name belongs on the specimen, and which way that spot
+  // faces. Content decides, in the order a reader would expect: a pin is a
+  // point someone chose, so it wins over a centre of mass nobody did.
+  ancrageDe(calque) {
+    return calque ? this._ancrage(calque) : null;
+  }
+
+  _ancrage(calque) {
+    const epingles = elementsDuGenre(calque, 'epingle');
+    if (epingles.length > 0) {
+      const premiere = epingles[0];
+      return {
+        position: new THREE.Vector3(...premiere.position),
+        normale: new THREE.Vector3(...premiere.normale),
+      };
+    }
+
+    const traces = elementsDuGenre(calque, 'trace');
+    if (traces.length > 0) {
+      const centre = this._centreDesEmpreintes(traces);
+      if (centre) return centre;
+    }
+
+    if (this.ancrageRegion && elementsDuGenre(calque, 'region').length > 0) {
+      const ancrage = this.ancrageRegion(calque);
+      if (ancrage?.position) {
+        return {
+          position: ancrage.position.clone(),
+          normale: ancrage.normale ? ancrage.normale.clone() : null,
+        };
+      }
+    }
+
+    const mesures = elementsDuGenre(calque, 'mesure');
+    for (const mesure of mesures) {
+      const points = mesure.points ?? [];
+      if (points.length === 0) continue;
+      // The stored points are the ones that were clicked; the walked path is
+      // rebuilt per capture and is not this file's to ask for. The middle
+      // vertex of the polyline is close enough to the middle of the line for a
+      // name to hang off it.
+      const milieu = points[Math.floor(points.length / 2)];
+      return { position: new THREE.Vector3(...milieu), normale: null };
+    }
+
+    return null;
+  }
+
+  // The unfolded body of a label: thumbnail, description, figures, standing.
+  // Returns null when there is nothing worth unfolding for — a named zone with
+  // an empty card should stay a name and not grow an empty box under it.
+  _detail(calque, fiche, description) {
+    const proprietes = (fiche?.proprietes ?? [])
+      .filter((p) => String(p.cle ?? '').trim() && String(p.valeur ?? '').trim());
+    const vignette = this._vignette(fiche);
+    const qualifie = ficheRenseignee(fiche);
+    if (!description && !vignette && proprietes.length === 0 && !qualifie) return null;
+
+    const detail = document.createElement('span');
+    detail.className = 'epingle-detail';
+    if (vignette) detail.appendChild(vignette);
+
+    if (description) {
+      const texte = document.createElement('span');
+      texte.className = 'epingle-description';
+      texte.textContent = description;
+      detail.appendChild(texte);
+    }
+
+    // The figures, not a count of them. « 3 propriétés » tells a reader they
+    // are missing something; « épaisseur 2 mm » tells them the thing.
+    if (proprietes.length > 0) {
+      const chiffres = document.createElement('span');
+      chiffres.className = 'epingle-chiffres';
+      for (const propriete of proprietes.slice(0, PROPRIETES_ETIQUETTE)) {
+        const puce = document.createElement('span');
+        puce.className = 'epingle-chiffre';
+        const cle = document.createElement('span');
+        cle.className = 'epingle-chiffre-cle';
+        cle.textContent = propriete.cle;
+        puce.append(cle, document.createTextNode(
+          ` ${propriete.valeur}${propriete.unite ? ` ${propriete.unite}` : ''}`,
+        ));
+        chiffres.appendChild(puce);
+      }
+      if (proprietes.length > PROPRIETES_ETIQUETTE) {
+        const reste = document.createElement('span');
+        reste.className = 'epingle-chiffre epingle-chiffre-reste';
+        reste.textContent = `+${proprietes.length - PROPRIETES_ETIQUETTE}`;
+        chiffres.appendChild(reste);
+      }
+      detail.appendChild(chiffres);
+    }
+
+    // How firmly it is said. The anchor ring already carries it as a shape,
+    // which is enough to warn but not enough to name — and « probable » and
+    // « vérifié » are not a nuance you want a reader to have to decode.
+    if (qualifie) {
+      const standing = document.createElement('span');
+      standing.className = 'epingle-qualification';
+      standing.textContent = `${NATURES[fiche.nature]?.libelle ?? 'Constat'} · `
+        + `${(CONFIANCES[fiche.confiance]?.libelle ?? 'Certain').toLowerCase()}`;
+      detail.appendChild(standing);
+    }
+
+    return detail;
+  }
+
+  // The first image attached to the card. Loading is asynchronous and the
+  // label may well have been rebuilt by the time it lands, so the result is
+  // dropped unless the element is still in the document.
+  _vignette(fiche) {
+    if (!this.medias || !this.doc) return null;
+    for (const id of fiche?.medias ?? []) {
+      const media = this.doc.medias.find((m) => m.id === id);
+      if (!media || media.genre !== 'image') continue;
+      const image = document.createElement('img');
+      image.className = 'epingle-vignette';
+      image.alt = '';
+      image.decoding = 'async';
+      this.medias.url(media).then((url) => {
+        if (url && image.isConnected) image.src = url;
+      }).catch(() => {});
+      return image;
+    }
+    return null;
+  }
+
+  _centreDesEmpreintes(traces) {
+    let total = 0;
+    for (const trace of traces) total += trace.empreintes?.length ?? 0;
+    if (total === 0) return null;
+    const pas = Math.max(1, Math.floor(total / ECHANTILLON_EMPREINTES));
+
+    const position = new THREE.Vector3();
+    const normale = new THREE.Vector3();
+    let n = 0;
+    let index = 0;
+    for (const trace of traces) {
+      // An eraser subtracts paint; taking its dabs into the centre of the zone
+      // would pull the name towards what is no longer there.
+      if (trace.efface === true) { index += trace.empreintes?.length ?? 0; continue; }
+      for (const empreinte of trace.empreintes ?? []) {
+        if (index++ % pas !== 0) continue;
+        position.x += empreinte[0];
+        position.y += empreinte[1];
+        position.z += empreinte[2];
+        normale.x += empreinte[3];
+        normale.y += empreinte[4];
+        normale.z += empreinte[5];
+        n += 1;
+      }
+    }
+    if (n === 0) return null;
+    position.divideScalar(n);
+
+    // …and the mean of a set of dabs is not one of them. On a curved flank it
+    // falls under the surface, where the occlusion ray finds the specimen's own
+    // shell in front of it and the label flickers off with every rotation. So
+    // the mean only says WHERE the zone is centred; the anchor returned is a
+    // sampled dab near it — an actual point of the surface, with the normal
+    // recorded when the brush laid it down.
+    //
+    // « Near it » is not enough on its own: a zone that wraps over a flank has
+    // dabs on both sides, and the one closest to the middle of the volume can
+    // be on the far one. The mean normal gives the zone's dominant facing, and
+    // the anchor is chosen among the dabs that share it.
+    const dominante = normale.lengthSq() > 1e-9
+      ? normale.clone().normalize()
+      : null;
+
+    const choisir = (accordMinimum) => {
+      let meilleure = null;
+      let ecartMin = Infinity;
+      let curseur = 0;
+      for (const trace of traces) {
+        if (trace.efface === true) { curseur += trace.empreintes?.length ?? 0; continue; }
+        for (const empreinte of trace.empreintes ?? []) {
+          if (curseur++ % pas !== 0) continue;
+          if (accordMinimum !== null) {
+            const accord = dominante.x * empreinte[3]
+              + dominante.y * empreinte[4] + dominante.z * empreinte[5];
+            if (accord < accordMinimum) continue;
+          }
+          const dx = empreinte[0] - position.x;
+          const dy = empreinte[1] - position.y;
+          const dz = empreinte[2] - position.z;
+          const ecart = dx * dx + dy * dy + dz * dz;
+          if (ecart < ecartMin) { ecartMin = ecart; meilleure = empreinte; }
+        }
+      }
+      return meilleure;
+    };
+
+    const meilleure = (dominante && choisir(ACCORD_ANCRAGE)) || choisir(null);
+    if (!meilleure) {
+      return { position, normale: dominante };
+    }
+
+    const normaleLocale = new THREE.Vector3(meilleure[3], meilleure[4], meilleure[5]);
+    return {
+      position: new THREE.Vector3(meilleure[0], meilleure[1], meilleure[2]),
+      normale: normaleLocale.lengthSq() > 1e-9 ? normaleLocale.normalize() : null,
+    };
+  }
+
+  // Whether a layer has anything to say, and permission to say it.
+  //
+  // An annotation always speaks: putting a pin down IS asking for a name on the
+  // specimen, even before anything has been written about it — a pin with no
+  // label would be an unmarked dot nobody could identify. Everything else waits
+  // until it has been described, so that a trial brush stroke does not plant a
+  // name in the view.
+  _parle(calque) {
+    if (calque.enfants) return false;
+    if (calque.etiquette === false) return false;
+    if (!this.doc.etiquetteEffective(calque.id)) return false;
+    if (!this.doc.visibleEffectivement(calque.id)) return false;
+    if (!this.doc.concerneSession(calque, this.sessionActive)) return false;
+    return elementsDuGenre(calque, 'epingle').length > 0 || ficheRenseignee(calque.fiche);
+  }
+
+  /* ------------------------------------------------------- construction */
 
   reconstruire() {
     this.etatsPlacement.clear();
     for (const entree of this.entrees) {
       clearTimeout(entree.fermeture);
-      this.etatsPlacement.set(entree.epingle.id, {
+      this.etatsPlacement.set(entree.calque.id, {
         cote: entree.cote,
         rect: entree.rectEtiquette ? { ...entree.rectEtiquette } : null,
       });
@@ -134,24 +399,25 @@ export class CoucheEpingles {
     this.conteneur.appendChild(this.liaisons);
 
     for (const { calque } of this.doc.aplatir()) {
-      if (calque.type !== 'annotation' || !calque.donnees) continue;
-      if (!this.doc.visibleEffectivement(calque.id)) continue;
-      if (!this.doc.concerneSession(calque, this.sessionActive)) continue;
-
-      const opacite = this.doc.opaciteEffective(calque.id);
-      for (const epingle of calque.donnees.elements) {
-        this.entrees.push(this._entree(epingle, calque, opacite));
-      }
+      if (!this._parle(calque)) continue;
+      const ancrage = this._ancrage(calque);
+      if (!ancrage) continue;
+      this.entrees.push(this._entree(calque, ancrage));
     }
 
     this.occlusionsRestantes = this.entrees.length;
     this.majPositions();
   }
 
-  _entree(epingle, calque, opacite) {
+  _entree(calque, ancrage) {
     const couleur = calque.couleur;
-    const groupe = this._groupeParent(calque);
-    const etat = this.etatsPlacement.get(epingle.id);
+    const opacite = this.doc.opaciteEffective(calque.id);
+    const groupe = this.doc.groupeExterieur(calque.id);
+    const etat = this.etatsPlacement.get(calque.id);
+    const fiche = calque.fiche;
+    const confiance = fiche?.confiance ?? 'certain';
+    const genres = genresDuCalque(calque);
+    const genre = genres[0] ?? TYPES_CALQUE[calque.type]?.genre ?? 'epingle';
 
     const ligne = document.createElementNS(SVG_NS, 'path');
     ligne.classList.add('epingle-liaison');
@@ -159,58 +425,72 @@ export class CoucheEpingles {
     ligne.style.opacity = String(opacite);
     this.liaisons.appendChild(ligne);
 
-    // The dot carries how firmly the statement is made. A solid ring is a
+    // The anchor carries how firmly the statement is made. A solid ring is a
     // certainty, a dashed one a hypothesis — read at a glance, on the specimen,
     // without opening anything. It is the cheapest way to stop a reader taking
     // « probable » for « measured ».
-    const confiance = epingle.confiance ?? 'certain';
-    const point = document.createElement('button');
-    point.type = 'button';
-    point.className = 'epingle-point';
-    point.dataset.confiance = confiance;
-    point.dataset.nature = epingle.nature ?? 'constat';
-    point.style.setProperty('--couleur', couleur);
-    point.style.opacity = String(opacite);
-    const qualite = confiance === 'certain' ? '' : ` (${confiance})`;
-    point.title = `${epingle.titre || 'Annotation sans titre'}${qualite}`;
-    point.setAttribute('aria-label', `Ouvrir : ${epingle.titre || 'annotation sans titre'}${qualite}`);
+    const point = this._pastille(calque, couleur, opacite, confiance, fiche);
 
     const etiquette = document.createElement('button');
     etiquette.type = 'button';
     etiquette.className = 'epingle-etiquette';
     etiquette.dataset.confiance = confiance;
+    etiquette.dataset.genre = genre;
     etiquette.style.setProperty('--couleur', couleur);
     etiquette.style.setProperty('--texte-etiquette', couleurTexte(couleur));
     etiquette.style.opacity = String(opacite);
+    // The dot of the OUTERMOST group, not of the one immediately above. Three
+    // labels of one entity, sitting at three different depths of the tree, have
+    // to wear the same mark or the mark says nothing about belonging.
     if (groupe) {
       etiquette.classList.add('dans-groupe');
       etiquette.style.setProperty('--couleur-groupe', groupe.couleur);
       etiquette.dataset.groupe = groupe.nom || 'Groupe';
     }
 
+    // The same silhouettes as the layer panel, in ink rather than in colour:
+    // on the specimen the label's own colour already says which layer it is,
+    // so the mark only has to say what kind of thing it is.
+    const marque = document.createElement('span');
+    marque.className = 'epingle-etiquette-genre';
+    marque.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true">${tracesSilhouette(genre)}</svg>`;
+    marque.setAttribute('aria-hidden', 'true');
+    etiquette.appendChild(marque);
+
     const titre = document.createElement('span');
     titre.className = 'epingle-etiquette-titre';
-    titre.textContent = epingle.titre || 'Sans titre';
+    titre.textContent = calque.nom || 'Sans titre';
     etiquette.appendChild(titre);
 
-    const description = resumer(epingle.texte);
-    if (description) {
-      const detail = document.createElement('span');
-      detail.className = 'epingle-description';
-      detail.textContent = description;
+    etiquette.title = `${calque.nom || 'Sans titre'} · ${GENRES[genre]?.libelle ?? ''}`
+      + (groupe ? ` · ${groupe.nom || 'Groupe'}` : '');
+
+    // What unfolds under the pointer.
+    //
+    // The label at rest is a name — that is all it should be, forty of them on
+    // a specimen is already a lot of ink. But hovering one is a question, and
+    // the answer used to be the description alone. What a reader actually
+    // wants at that moment is the same thing they want from the card: what is
+    // claimed, how firmly, on what figures, and what it looks like. The
+    // thumbnail earns its place here more than anywhere: a photograph of a
+    // crack settles in a glance what a sentence about it argues.
+    const description = resumer(fiche?.texte);
+    const detail = this._detail(calque, fiche, description);
+    if (detail) {
       etiquette.appendChild(detail);
       etiquette.setAttribute('aria-expanded', 'false');
     }
 
     const entree = {
-      epingle,
       calque,
       point,
+      pointsSecondaires: this._pointsSecondaires(calque, couleur, opacite, confiance),
       etiquette,
       ligne,
       description,
-      position: new THREE.Vector3(...epingle.position),
-      normale: new THREE.Vector3(...epingle.normale),
+      detail,
+      position: ancrage.position,
+      normale: ancrage.normale,
       visible: true,
       depliee: false,
       appui: false,
@@ -225,10 +505,13 @@ export class CoucheEpingles {
 
     const ouvrir = (evenement) => {
       evenement.stopPropagation();
-      this.surSelection?.(epingle.id, calque.id);
+      this.surSelection?.(calque.id);
     };
     point.addEventListener('click', ouvrir);
     etiquette.addEventListener('click', ouvrir);
+    for (const secondaire of entree.pointsSecondaires) {
+      secondaire.element.addEventListener('click', ouvrir);
+    }
 
     // Keep the same hit target for the whole gesture. The label layout may be
     // recomputed while a description expands, but pointer capture guarantees
@@ -248,7 +531,9 @@ export class CoucheEpingles {
     etiquette.addEventListener('pointercancel', finirAppui);
 
     const deplier = (actif) => {
-      if (!description || entree.depliee === actif) return;
+      // Gated on the body, not on the description: a zone can now unfold for a
+      // photograph or a measured value with no sentence written at all.
+      if (!detail || entree.depliee === actif) return;
       entree.depliee = actif;
       etiquette.classList.toggle('depliee', actif);
       etiquette.setAttribute('aria-expanded', String(actif));
@@ -270,17 +555,48 @@ export class CoucheEpingles {
     etiquette.addEventListener('blur', () => deplier(false));
 
     this.conteneur.append(point, etiquette);
-    if (epingle.id === this.selection) {
+    for (const secondaire of entree.pointsSecondaires) {
+      this.conteneur.appendChild(secondaire.element);
+    }
+    if (calque.id === this.selection) {
       point.classList.add('selectionnee');
       etiquette.classList.add('selectionnee');
     }
     return entree;
   }
 
-  _groupeParent(calque) {
-    const parent = this.doc?.parentDe(calque.id);
-    return parent && parent !== this.doc.racine && parent.type === 'groupe' ? parent : null;
+  _pastille(calque, couleur, opacite, confiance, fiche) {
+    const point = document.createElement('button');
+    point.type = 'button';
+    point.className = 'epingle-point';
+    point.dataset.confiance = confiance;
+    point.dataset.nature = fiche?.nature ?? 'constat';
+    point.style.setProperty('--couleur', couleur);
+    point.style.opacity = String(opacite);
+    const qualite = confiance === 'certain' ? '' : ` (${confiance})`;
+    point.title = `${calque.nom || 'Sans titre'}${qualite}`;
+    point.setAttribute('aria-label', `Ouvrir : ${calque.nom || 'sans titre'}${qualite}`);
+    return point;
   }
+
+  // An annotation is one pin, so this is normally empty. It exists for the
+  // documents that predate that rule and reach the migration with a layer whose
+  // pins could not be separated: they keep their dots, and share one name.
+  _pointsSecondaires(calque, couleur, opacite, confiance) {
+    const epingles = elementsDuGenre(calque, 'epingle');
+    return epingles.slice(1).map((epingle) => {
+      const element = this._pastille(calque, couleur, opacite, confiance, calque.fiche);
+      element.classList.add('secondaire');
+      return {
+        element,
+        position: new THREE.Vector3(...epingle.position),
+        normale: new THREE.Vector3(...epingle.normale),
+        visible: true,
+      };
+    });
+  }
+
+  /* ------------------------------------------------------------ positions */
 
   // Called after an actual 3D render: anchors follow the camera, then labels
   // are repacked around the newly projected specimen bounds.
@@ -299,14 +615,32 @@ export class CoucheEpingles {
       entree.x = (this._position.x * 0.5 + 0.5) * largeur;
       entree.y = (-this._position.y * 0.5 + 0.5) * hauteur;
 
-      this._versCamera.copy(camera.position).sub(entree.position).normalize();
-      const orientation = this._normale.copy(entree.normale).dot(this._versCamera);
-      // Two thresholds prevent an annotation on the silhouette from flashing
-      // on and off when the camera moves by a fraction of a degree.
-      entree.faceVisible = orientation > (entree.faceVisible ? -0.24 : -0.06);
+      // A region's centre of area and a measurement's midpoint have no surface
+      // normal — they are not points ON the surface, they stand for a whole
+      // extent. Only the occlusion ray decides for those.
+      if (entree.normale) {
+        this._versCamera.copy(camera.position).sub(entree.position).normalize();
+        const orientation = this._normale.copy(entree.normale).dot(this._versCamera);
+        // Two thresholds prevent an annotation on the silhouette from flashing
+        // on and off when the camera moves by a fraction of a degree.
+        entree.faceVisible = orientation > (entree.faceVisible ? -0.24 : -0.06);
+      } else {
+        entree.faceVisible = true;
+      }
+
       const dansLeCadre = entree.x >= 0 && entree.x <= largeur && entree.y >= 0 && entree.y <= hauteur;
       entree.visible = !derriere && entree.faceVisible && dansLeCadre && !entree.occulte;
       entree.profondeur = this._position.z;
+
+      for (const secondaire of entree.pointsSecondaires) {
+        this._projection.copy(secondaire.position).project(camera);
+        secondaire.x = (this._projection.x * 0.5 + 0.5) * largeur;
+        secondaire.y = (-this._projection.y * 0.5 + 0.5) * hauteur;
+        this._versCamera.copy(camera.position).sub(secondaire.position).normalize();
+        const oriente = this._normale.copy(secondaire.normale).dot(this._versCamera);
+        secondaire.visible = this._projection.z <= 1 && oriente > -0.06;
+        secondaire.profondeur = this._projection.z;
+      }
     }
 
     this._testerOcclusions();
@@ -376,8 +710,11 @@ export class CoucheEpingles {
 
     const zone = this._zoneDisponible(largeur, hauteur);
     const modele = this.pointeur.rectangleModelePrincipal(ECART_MODELE);
+    // The card now sits at the foot of the view rather than inside a panel, so
+    // it is an obstacle labels have to be laid out around like any other.
     const obstaclesInterface = [...document.querySelectorAll(
-      '.barre-outils, .reglages-outil:not([hidden]), .hint, .viewer-status.visible',
+      '.barre-outils, .reglages-outil:not([hidden]), .hint, .viewer-status.visible,'
+      + ' .fiche-flottante:not([hidden])',
     )].map((element) => element.getBoundingClientRect())
       .filter((rect) => rect.width > 0 && rect.height > 0);
     const visibles = this.entrees.filter((entree) => entree.visible);
@@ -387,9 +724,18 @@ export class CoucheEpingles {
       entree.point.classList.toggle('cachee', cachee);
       entree.etiquette.classList.toggle('cachee', cachee);
       entree.ligne.classList.toggle('cachee', cachee);
-      if (cachee) continue;
-      entree.point.style.transform = `translate3d(${entree.x.toFixed(1)}px, ${entree.y.toFixed(1)}px, 0)`;
-      entree.point.style.zIndex = String(1200 - Math.round(entree.profondeur * 500));
+      if (!cachee) {
+        entree.point.style.transform = `translate3d(${entree.x.toFixed(1)}px, ${entree.y.toFixed(1)}px, 0)`;
+        entree.point.style.zIndex = String(1200 - Math.round(entree.profondeur * 500));
+      }
+      for (const secondaire of entree.pointsSecondaires) {
+        const masque = cachee || !secondaire.visible;
+        secondaire.element.classList.toggle('cachee', masque);
+        if (masque) continue;
+        secondaire.element.style.transform =
+          `translate3d(${secondaire.x.toFixed(1)}px, ${secondaire.y.toFixed(1)}px, 0)`;
+        secondaire.element.style.zIndex = String(1200 - Math.round(secondaire.profondeur * 500));
+      }
     }
 
     if (!placementComplet) {
@@ -580,7 +926,7 @@ export class CoucheEpingles {
     const vertical = cote === 'gauche' || cote === 'droite';
     const coordonnee = (entree) => (vertical ? entree.y : entree.x);
     entrees.sort((a, b) => coordonnee(a) - coordonnee(b)
-      || String(a.epingle.id).localeCompare(String(b.epingle.id)));
+      || String(a.calque.id).localeCompare(String(b.calque.id)));
 
     const { minimum, maximum } = this._bornesRail(cote, zone, modele);
     const tailles = entrees.map((entree) => this._tailleSurRail(entree, cote));

@@ -71,3 +71,12 @@ sessions/91D4BE57-FE01-49B7-847D-A0044DAF6CC2/
 # Sauvegardes du redressement de la géométrie. Les fichiers d’origine sont
 # déjà dans l’historique git : ces copies sont un filet local, pas une archive.
 *.avant-redressement
+
+# Export manuel fait en testant le bouton « Exporter » — un double de
+# annotations/annotations.json (le fichier que le site charge réellement,
+# via CHEMIN_PUBLIE) plus un média, posé à la racine par le navigateur.
+annotations.zip
+
+# Images de test, jamais référencées par le code.
+chelidonichthys.jpg
+images.jpg

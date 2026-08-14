@@ -4,7 +4,9 @@
 // which wraps it in an undo command and schedules the local draft save — so
 // there is no path by which a change escapes the undo stack or gets lost.
 
-import { creerCalque, TYPES_CALQUE, DocumentAnnotation } from '../document/modele.js';
+import {
+  creerCalque, TYPES_CALQUE, DocumentAnnotation, identifiant, ficheRenseignee,
+} from '../document/modele.js';
 import { commandeInstantane } from '../document/commandes.js';
 import { exporter, telecharger } from '../document/stockage.js';
 import { construireZip, lireZip } from '../document/zip.js';
@@ -12,37 +14,14 @@ import { ListeCalques } from './liste-calques.js';
 import { Inspecteur } from './inspecteur.js';
 import { Fiche } from './fiche.js';
 
-// Only the kinds a tool can actually fill. Offering a type nothing can put
-// anything into was the main thing making the tool/layer relationship
-// confusing. « Mesure » is back because the ruler is; « Contour » stays out
-// until it has a tool of its own — a region already draws its own outline.
-const TYPES_CREABLES = ['annotation', 'peinture', 'region', 'mesure'];
-const TYPES_FUSION_DIRECTE = new Set(['annotation', 'mesure', 'region']);
 const CLE_INSPECTEUR_OUVERT = 'durair.inspecteur.ouvert';
 const CLE_INSPECTEUR_HAUTEUR = 'durair.inspecteur.hauteur';
 const HAUTEUR_INSPECTEUR_DEFAUT = 260;
 const HAUTEUR_INSPECTEUR_MIN = 96;
 
-function memePortee(a, b) {
-  return JSON.stringify(a.portee ?? 'toutes') === JSON.stringify(b.portee ?? 'toutes');
-}
-
-// Concatenating two content arrays is visually lossless only for these types
-// and only when both layers already share all inherited rendering choices.
-// Paint is deliberately excluded: an eraser on the upper layer must never
-// start erasing strokes from the lower layer after a so-called merge.
-function fusionCompatible(haut, bas) {
-  return Boolean(haut && bas
-    && TYPES_FUSION_DIRECTE.has(haut.type)
-    && haut.type === bas.type
-    && !haut.enfants && !bas.enfants
-    && haut.couleur === bas.couleur
-    && haut.opacite === bas.opacite
-    && haut.visible === bas.visible
-    && haut.verrouille === bas.verrouille
-    && haut.contour === bas.contour
-    && memePortee(haut, bas));
-}
+const CLE_FICHE_HAUTEUR = 'durair.fiche.hauteur';
+const HAUTEUR_FICHE_DEFAUT = 300;
+const HAUTEUR_FICHE_MIN = 150;
 
 export class PanneauDroit {
   constructor(elements, options) {
@@ -60,9 +39,6 @@ export class PanneauDroit {
     this.surCentrage = null;
     // Set by the application: keeps the active tool in step with the selection.
     this.surSelectionCalque = null;
-    // A single selection shared by the 3D labels and the rows nested under an
-    // annotation layer.
-    this.surSelectionElement = null;
     this.surDemandeOuverture = null;
     this.surConversionRegion = null;
     this.surLissageRegion = null;
@@ -75,28 +51,34 @@ export class PanneauDroit {
     this.liste = new ListeCalques(elements.liste, {
       document: doc,
       surMutation: this.muter,
-      surApercu: (detail) => this._planifierApercu(detail),
       surSelection: (id) => {
-        if (this.fiche.ouverte) this.fermerFiche();
-        this.inspecteur.afficher(id);
+        // A card left open on a layer nobody is looking at any more is a card
+        // that gets edited by mistake. Selecting another layer moves it.
+        if (this.fiche.ouverte && this.fiche.idCalque !== id) {
+          if (id && ficheRenseignee(this.doc.trouver(id)?.fiche)) this.fiche.ouvrir(id);
+          else this.fermerFiche();
+        }
+        this.inspecteur.afficher(id, this.liste.selections.size);
         this.surSelectionCalque?.(id);
         this._majActions();
-      },
-      surSelectionElement: (idElement, idCalque) => {
-        this.ouvrirFiche(idElement, idCalque);
       },
     });
 
     this.inspecteur = new Inspecteur(elements.inspecteur, {
       document: doc,
       surMutation: this.muter,
+      // The opacity slider's live preview. It used to be handed to the layer
+      // list, which has no slider and ignored it, so dragging opacity showed
+      // nothing until the mouse was released — every intermediate value went
+      // to a callback that did not exist.
+      surApercu: (detail) => this._planifierApercu(detail),
       sessions: this.sessions,
       couleurs: options.couleurs,
       mesures: (calque) => this.mesures?.(calque) ?? null,
       comparaison: (calque) => this.comparaison?.(calque) ?? null,
       surConversionRegion: (calque) => this.surConversionRegion?.(calque),
       surLissageRegion: (calque) => this.surLissageRegion?.(calque),
-      surOuvrirFiche: (idCalque) => this.ouvrirFicheCalque(idCalque),
+      surOuvrirFiche: (idCalque) => this.ouvrirFiche(idCalque),
     });
 
     this.fiche = new Fiche(elements.fiche, {
@@ -104,11 +86,15 @@ export class PanneauDroit {
       medias: this.medias,
       surMutation: this.muter,
       surFermeture: () => this.fermerFiche(),
-      surCentrage: (epingle) => this.surCentrage?.(epingle),
-      surSuppression: (idEpingle, idCalque) => this.supprimerEpingle(idEpingle, idCalque),
+      surCentrage: (calque) => this.surCentrage?.(calque),
+      surSuppression: (idCalque) => this.supprimerCalque(idCalque),
       surMemoriserVue: () => this.surMemoriserVue?.() ?? null,
       surRestituerVue: (vue) => this.surRestituerVue?.(vue),
     });
+
+    this.fiche.surPoignee = (poignee) => this._brancherPoigneeFiche(poignee);
+    this._appliquerHauteurFiche(Number(localStorage.getItem(CLE_FICHE_HAUTEUR))
+      || HAUTEUR_FICHE_DEFAUT, false);
 
     this._brancherActions();
     this._brancherVoletInspecteur();
@@ -130,51 +116,80 @@ export class PanneauDroit {
 
   /* --------------------------------------------------------------- fiche */
 
-  ouvrirFiche(idEpingle, idCalque) {
-    this.surDemandeOuverture?.();
-    const dejaSelectionnee = this.liste.selectionElement?.idElement === idEpingle
-      && this.liste.selectionElement?.idCalque === idCalque;
-    if (!dejaSelectionnee && !this.liste.selectionnerElement(idEpingle, idCalque, false)) return;
-    this.fiche.ouvrir(idEpingle, idCalque);
-    this.elements.panneau.classList.add('fiche-ouverte');
-    this.surSelectionCalque?.(idCalque);
-    this.surSelectionElement?.(idEpingle, idCalque);
-  }
-
   // The layer as the subject of its own card. Selection is set without
-  // notifying, because the panel's own selection callback closes any open card
-  // — which would shut this one the moment it opened.
-  ouvrirFicheCalque(idCalque) {
+  // notifying, because the panel's own selection callback would move the card
+  // that is being opened.
+  ouvrirFiche(idCalque) {
     if (!this.doc.trouver(idCalque)) return;
     this.surDemandeOuverture?.();
-    this.liste.selectionner(idCalque, false);
-    this.fiche.ouvrirCalque(idCalque);
-    this.elements.panneau.classList.add('fiche-ouverte');
+    if (this.liste.selection !== idCalque) this.liste.selectionner(idCalque, false);
+    this.fiche.ouvrir(idCalque);
+    this.inspecteur.afficher(idCalque, this.liste.selections.size);
     this.surSelectionCalque?.(idCalque);
-    this.surSelectionElement?.(null, idCalque);
     this._majActions();
   }
 
   fermerFiche() {
     this.fiche.fermer();
-    this.elements.panneau.classList.remove('fiche-ouverte');
-    this.liste.selectionElement = null;
-    this.liste.rendre();
-    this.inspecteur.afficher(this.liste.selection);
+    this.inspecteur.afficher(this.liste.selection, this.liste.selections.size);
     this._majActions();
-    this.surSelectionElement?.(null, this.liste.selection);
-    this.surChangementDocument?.(null);
   }
 
-  supprimerEpingle(idEpingle, idCalque) {
-    this.muter('Supprimer l’annotation', () => {
-      const calque = this.doc.trouver(idCalque);
-      if (!calque?.donnees) return;
-      calque.donnees.elements = calque.donnees.elements.filter((e) => e.id !== idEpingle);
+  /* ------------------------------------------------- hauteur de la fiche */
+
+  // The card grows upwards from the foot of the view: dragging its top edge is
+  // the only handle it can have, since its bottom is pinned there.
+  _brancherPoigneeFiche(poignee) {
+    let glisse = null;
+
+    poignee.addEventListener('pointerdown', (evenement) => {
+      if (evenement.button !== undefined && evenement.button !== 0) return;
+      glisse = {
+        pointeur: evenement.pointerId,
+        y: evenement.clientY,
+        hauteur: this.hauteurFiche,
+      };
+      poignee.setPointerCapture?.(evenement.pointerId);
+      poignee.classList.add('redimensionnement');
+      evenement.preventDefault();
     });
-    this.fermerFiche();
+
+    poignee.addEventListener('pointermove', (evenement) => {
+      if (!glisse || evenement.pointerId !== glisse.pointeur) return;
+      this._appliquerHauteurFiche(glisse.hauteur + glisse.y - evenement.clientY, false);
+      evenement.preventDefault();
+    });
+
+    const finir = (evenement) => {
+      if (!glisse || evenement.pointerId !== glisse.pointeur) return;
+      if (poignee.hasPointerCapture?.(evenement.pointerId)) {
+        poignee.releasePointerCapture(evenement.pointerId);
+      }
+      glisse = null;
+      poignee.classList.remove('redimensionnement');
+      localStorage.setItem(CLE_FICHE_HAUTEUR, String(Math.round(this.hauteurFiche)));
+    };
+    poignee.addEventListener('pointerup', finir);
+    poignee.addEventListener('pointercancel', finir);
+    poignee.addEventListener('dblclick', () => this._appliquerHauteurFiche(HAUTEUR_FICHE_DEFAUT));
   }
 
+  _appliquerHauteurFiche(hauteur, memoriser = true) {
+    const maximum = Math.max(HAUTEUR_FICHE_MIN, Math.floor(window.innerHeight * 0.78));
+    this.hauteurFiche = Math.max(HAUTEUR_FICHE_MIN, Math.min(maximum, hauteur));
+    document.documentElement.style.setProperty('--hauteur-fiche', `${this.hauteurFiche}px`);
+    if (memoriser) localStorage.setItem(CLE_FICHE_HAUTEUR, String(Math.round(this.hauteurFiche)));
+  }
+
+  supprimerCalque(idCalque) {
+    const calque = this.doc.trouver(idCalque);
+    if (!calque) return;
+    this.muter(`Supprimer « ${calque.nom} »`, () => this.doc.retirer(idCalque));
+    if (this.fiche.idCalque === idCalque) this.fermerFiche();
+    this.liste.selectionner(null);
+    this.inspecteur.afficher(null);
+    this.rafraichir();
+  }
 
   definirSessions(sessions) {
     this.sessions = sessions;
@@ -194,16 +209,14 @@ export class PanneauDroit {
   }
 
   rafraichir() {
-    // A card whose subject no longer exists — its layer deleted, its pin undone
-    // — closes through the panel rather than through itself, so the panel's own
-    // « card open » state goes with it. Hiding the card alone left the list
-    // pushed aside behind nothing.
+    // A card whose subject no longer exists — its layer deleted, its creation
+    // undone — closes through the panel rather than through itself.
     if (this.fiche.ouverte && !this.doc.trouver(this.fiche.idCalque)) this.fermerFiche();
 
     // Invalidate/recompose before the inspector asks for derived metrics.
     // Doing it afterwards computed an expensive paint area only to discard
     // its cache immediately in the document-change callback.
-    this.surChangementDocument?.(this.fiche.ouverte ? this.fiche.idEpingle : null);
+    this.surChangementDocument?.(this.liste.selection);
     this.liste.rendre();
     this.inspecteur.rendre();
     if (this.fiche.ouverte) this.fiche.rendre();
@@ -220,7 +233,7 @@ export class PanneauDroit {
       const courant = this.detailApercu;
       this.detailApercu = null;
       if (this.surApercuDocument) this.surApercuDocument(courant);
-      else this.surChangementDocument?.(this.fiche.ouverte ? this.fiche.idEpingle : null);
+      else this.surChangementDocument?.(this.liste.selection);
     });
   }
 
@@ -231,33 +244,13 @@ export class PanneauDroit {
   /* ------------------------------------------------------------- actions */
 
   _brancherActions() {
-    const { nouveauCalque, nouveauGroupe, dupliquer, supprimer, fusionner,
+    const { nouveauGroupe, dupliquer, supprimer,
       annuler, retablir, exporter: boutonExport, importer: boutonImport,
-      fichierImport, menu } = this.elements;
+      fichierImport } = this.elements;
 
-    nouveauCalque.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this._basculerMenu();
-    });
-
-    for (const type of TYPES_CREABLES) {
-      const option = document.createElement('button');
-      option.type = 'button';
-      option.className = 'menu-option';
-      option.innerHTML = `<span class="menu-icone">${TYPES_CALQUE[type].icone}</span>${TYPES_CALQUE[type].libelle}`;
-      option.addEventListener('click', () => {
-        this._fermerMenu();
-        this._creer(type);
-      });
-      menu.appendChild(option);
-    }
-
-    document.addEventListener('click', () => this._fermerMenu());
-
-    nouveauGroupe.addEventListener('click', () => this._creer('groupe'));
+    nouveauGroupe.addEventListener('click', () => this._creerGroupe());
     dupliquer.addEventListener('click', () => this._dupliquer());
     supprimer.addEventListener('click', () => this._supprimer());
-    fusionner.addEventListener('click', () => this._fusionnerVersLeBas());
     annuler.addEventListener('click', () => { this.pile.annuler(); this._apresHistorique(); });
     retablir.addEventListener('click', () => { this.pile.retablir(); this._apresHistorique(); });
     boutonExport.addEventListener('click', () => this._exporter());
@@ -410,9 +403,10 @@ export class PanneauDroit {
       }
     }
 
+    this.fermerFiche();
     this.definirDocument(DocumentAnnotation.deserialiser(donnees));
     this.pile.vider();
-    this.liste.selection = null;
+    this.liste.selectionner(null, false);
     this.inspecteur.afficher(null);
     this.rafraichir();
     this.sauvegarde?.planifier(this.doc.serialiser());
@@ -425,85 +419,81 @@ export class PanneauDroit {
     return true;
   }
 
-  _basculerMenu() {
-    this.elements.menu.classList.toggle('ouvert');
-  }
+  /* ------------------------------------------------------------- création */
 
-  _fermerMenu() {
-    this.elements.menu.classList.remove('ouvert');
-  }
+  // Groups are the only thing that can still be created by hand.
+  //
+  // Empty layers cannot, and that is the point: a « Peinture » with nothing in
+  // it was a row that looked like work and was not, and there were always three
+  // of them because trying a tool used to make one. A layer now comes into
+  // being with its first stroke, its first pin, its first measurement. A group
+  // is different in kind — an empty group is a decision about how the document
+  // is organised, made before there is anything to put in it.
+  _creerGroupe() {
+    const calque = creerCalque('groupe');
+    calque.nom = this.doc.nomDisponible(TYPES_CALQUE.groupe.libelle);
+    const selection = this.liste.calquesSelectionnes();
 
-  // New layers land just above the selection, like in any layer panel.
-  _creer(type) {
-    const calque = creerCalque(type);
-    calque.nom = this.doc.nomDisponible(TYPES_CALQUE[type].libelle);
-    const courant = this.selection;
-    let idParent = null;
-    let index = null;
-
-    if (courant) {
-      if (courant.enfants && !courant.replie
-        && !this.doc.verrouilleEffectivement(courant.id)) {
-        idParent = courant.id;
-        index = courant.enfants.length;
-      } else {
-        const parent = this.doc.parentDe(courant.id);
-        idParent = parent === this.doc.racine ? null : parent.id;
-        index = parent.enfants.findIndex((c) => c.id === courant.id) + 1;
-      }
+    // With layers selected, the group is made AROUND them: that is what one
+    // wants nine times out of ten, and doing it by hand means creating the
+    // group and then dragging each layer into it.
+    if (selection.length > 0) {
+      const premier = selection[0];
+      const parent = this.doc.parentDe(premier.id);
+      const idParent = parent === this.doc.racine ? null : parent.id;
+      const index = parent.enfants.findIndex((c) => c.id === premier.id);
+      const ids = selection.map((c) => c.id);
+      this.muter(`Grouper ${ids.length} calque${ids.length > 1 ? 's' : ''}`, () => {
+        this.doc.ajouter(calque, idParent, index);
+        for (const id of ids) {
+          if (this.doc.contient(id, calque.id)) continue;
+          this.doc.deplacer(id, calque.id, calque.enfants.length);
+        }
+      });
+      this.liste.selectionner(calque.id);
+      return;
     }
 
-    this.muter(`Nouveau ${TYPES_CALQUE[type].libelle.toLowerCase()}`,
-      () => this.doc.ajouter(calque, idParent, index));
+    this.muter('Nouveau groupe', () => this.doc.ajouter(calque, null, null));
     this.liste.selectionner(calque.id);
   }
 
   _dupliquer() {
-    const courant = this.selection;
-    if (!courant) return;
-    const parent = this.doc.parentDe(courant.id);
-    const index = parent.enfants.findIndex((c) => c.id === courant.id) + 1;
-    const copie = renommerRecursivement(structuredClone(courant));
-    copie.nom = this.doc.nomDisponible(`${courant.nom} copie`);
+    const selection = this.liste.calquesSelectionnes();
+    if (selection.length === 0) return;
+    const copies = [];
 
-    this.muter('Dupliquer', () => this.doc.ajouter(
-      copie, parent === this.doc.racine ? null : parent.id, index,
-    ));
-    this.liste.selectionner(copie.id);
+    this.muter(selection.length > 1 ? 'Dupliquer les calques' : 'Dupliquer', () => {
+      for (const courant of selection) {
+        const parent = this.doc.parentDe(courant.id);
+        if (!parent) continue;
+        const index = parent.enfants.findIndex((c) => c.id === courant.id) + 1;
+        const copie = renommerRecursivement(structuredClone(courant));
+        copie.nom = this.doc.nomDisponible(`${courant.nom} copie`);
+        this.doc.ajouter(copie, parent === this.doc.racine ? null : parent.id, index);
+        copies.push(copie.id);
+      }
+    });
+
+    this.liste.selections = new Set(copies);
+    this.liste.selection = copies.at(-1) ?? null;
+    this.rafraichir();
+    this.inspecteur.afficher(this.liste.selection, this.liste.selections.size);
+    this.surSelectionCalque?.(this.liste.selection);
   }
 
   _supprimer() {
-    const courant = this.selection;
-    if (!courant) return;
-    const nom = courant.nom;
-    this.muter(`Supprimer « ${nom} »`, () => this.doc.retirer(courant.id));
-    this.liste.selection = null;
+    const selection = this.liste.calquesSelectionnes();
+    if (selection.length === 0) return;
+    const nom = selection.length === 1
+      ? `Supprimer « ${selection[0].nom} »`
+      : `Supprimer ${selection.length} calques`;
+    const ids = selection.map((c) => c.id);
+    this.muter(nom, () => { for (const id of ids) this.doc.retirer(id); });
+    if (this.fiche.ouverte && !this.doc.trouver(this.fiche.idCalque)) this.fermerFiche();
+    this.liste.selectionner(null);
     this.inspecteur.afficher(null);
     this.rafraichir();
-  }
-
-  // Merge rule, decided once so it never has to be argued again:
-  //   • same type      → the two layers become one, contents concatenated;
-  //   • anything else  → they go into a group instead.
-  // Grouping rather than merging incompatible types is the honest option: a
-  // merge that silently drops half the information would be worse than a
-  // slightly different result, and the panel still ends up with one row.
-  _fusionnerVersLeBas() {
-    const courant = this.selection;
-    if (!courant) return;
-    const parent = this.doc.parentDe(courant.id);
-    const index = parent.enfants.findIndex((c) => c.id === courant.id);
-    if (index <= 0) return;
-    const dessous = parent.enfants[index - 1];
-
-    if (!fusionCompatible(courant, dessous)) return;
-    this.muter(`Fusionner « ${courant.nom} »`, () => {
-      const bas = this.doc.trouver(dessous.id);
-      const haut = this.doc.trouver(courant.id);
-      bas.donnees.elements = [...bas.donnees.elements, ...haut.donnees.elements];
-      this.doc.retirer(haut.id);
-    });
-    this.liste.selectionner(dessous.id);
   }
 
   _apresHistorique() {
@@ -522,20 +512,17 @@ export class PanneauDroit {
   }
 
   _majActions() {
-    const courant = this.selection;
-    this.elements.dupliquer.disabled = !courant;
-    this.elements.supprimer.disabled = !courant;
+    const nombre = this.liste.selections.size;
+    const { dupliquer, supprimer, nouveauGroupe } = this.elements;
 
-    let fusionnable = false;
-    if (courant) {
-      const parent = this.doc.parentDe(courant.id);
-      const index = parent.enfants.findIndex((c) => c.id === courant.id);
-      fusionnable = index > 0 && fusionCompatible(courant, parent.enfants[index - 1]);
-    }
-    this.elements.fusionner.disabled = !fusionnable;
-    this.elements.fusionner.title = fusionnable
-      ? 'Fusionner avec le calque du dessous sans modifier le rendu'
-      : 'Fusion disponible pour deux calques compatibles de même type et de même apparence';
+    dupliquer.disabled = nombre === 0;
+    dupliquer.title = nombre > 1 ? `Dupliquer les ${nombre} calques` : 'Dupliquer le calque';
+    supprimer.disabled = nombre === 0;
+    supprimer.title = nombre > 1 ? `Supprimer les ${nombre} calques` : 'Supprimer le calque';
+    nouveauGroupe.title = nombre > 0
+      ? `Grouper ${nombre} calque${nombre > 1 ? 's' : ''}`
+      : 'Nouveau groupe';
+
     this._majLibelleInspecteur();
   }
 
@@ -610,9 +597,39 @@ export class PanneauDroit {
     });
   }
 
+  // How tall the inspector is allowed to get.
+  //
+  // This was 68 % of the panel, a fraction picked without asking what else had
+  // to fit. The header, the draft line, the action row, the list's own minimum,
+  // the resize bar and the export footer together need more than the remaining
+  // 32 %, so dragging the inspector up pushed the footer out of the panel —
+  // out of reach, since a panel that manages its own scrolling regions does not
+  // scroll as a whole. The ceiling is now measured rather than guessed: what is
+  // left once every sibling has taken what it genuinely needs.
   _hauteurInspecteurMax() {
-    return Math.max(HAUTEUR_INSPECTEUR_MIN,
-      Math.floor((this.elements.panneau.clientHeight || window.innerHeight) * 0.68));
+    const panneau = this.elements.panneau;
+    const inspecteur = this.elements.inspecteur;
+    if (!panneau || !inspecteur) return HAUTEUR_INSPECTEUR_DEFAUT;
+
+    const style = getComputedStyle(panneau);
+    const enfants = [...panneau.children]
+      .filter((enfant) => getComputedStyle(enfant).display !== 'none');
+    const ecart = parseFloat(style.rowGap) || 0;
+
+    let occupe = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0)
+      + ecart * Math.max(0, enfants.length - 1);
+
+    for (const enfant of enfants) {
+      if (enfant === inspecteur) continue;
+      // The list is the one that stretches, so its current height is whatever
+      // the inspector left it — circular. Its floor is what must be reserved.
+      occupe += enfant === this.elements.liste
+        ? (parseFloat(getComputedStyle(enfant).minHeight) || 0)
+        : enfant.getBoundingClientRect().height;
+    }
+
+    const disponible = (panneau.clientHeight || window.innerHeight) - occupe;
+    return Math.max(HAUTEUR_INSPECTEUR_MIN, Math.floor(disponible));
   }
 
   _appliquerHauteurInspecteur(hauteur, memoriser = true) {
@@ -640,7 +657,10 @@ export class PanneauDroit {
     const texte = this.elements.inspecteurBasculeTexte;
     if (!texte) return;
     const calque = this.selection;
-    texte.textContent = calque ? `Propriétés · ${calque.nom}` : 'Propriétés';
+    const nombre = this.liste.selections.size;
+    texte.textContent = nombre > 1
+      ? `Propriétés · ${nombre} calques`
+      : (calque ? `Propriétés · ${calque.nom}` : 'Propriétés');
     texte.title = texte.textContent;
   }
 
@@ -665,23 +685,20 @@ export class PanneauDroit {
         this._apresHistorique();
         return;
       }
-      if (evenement.key === 'Delete' || evenement.key === 'Backspace') {
-        if (this.liste.selectionElement) {
-          evenement.preventDefault();
-          const { idElement, idCalque } = this.liste.selectionElement;
-          this.supprimerEpingle(idElement, idCalque);
-          return;
-        }
-        if (!this.selection) return;
+      if (meta && evenement.key.toLowerCase() === 'g') {
         evenement.preventDefault();
-        this._supprimer();
+        this._creerGroupe();
         return;
       }
-      if (evenement.key === 'F2' && this.liste.selectionElement) {
+      if (evenement.key === 'Escape' && this.fiche.ouverte) {
         evenement.preventDefault();
-        const champ = this.elements.fiche.querySelector('.fiche-titre');
-        champ?.focus();
-        champ?.select();
+        this.fermerFiche();
+        return;
+      }
+      if (evenement.key === 'Delete' || evenement.key === 'Backspace') {
+        if (this.liste.selections.size === 0) return;
+        evenement.preventDefault();
+        this._supprimer();
         return;
       }
       if (evenement.key === 'F2' && this.selection) {
@@ -703,15 +720,26 @@ export class PanneauDroit {
     bandeau.replaceChildren();
     bandeau.hidden = false;
 
-    const texte = document.createElement('span');
+    // Two lines and a framed button for a status that is true nearly all the
+    // time: it ate the top of the panel to say « you have unsaved work », which
+    // is the normal state of anyone annotating. It says the same thing on one
+    // short line now — the date it was carrying is not what you read here, so
+    // it moved to the tooltip, where it stays available for the one moment you
+    // do need it.
     const date = new Date(info.modifie);
-    texte.textContent = `Brouillon local · ${date.toLocaleDateString('fr-FR')} à `
-      + `${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
+    const heure = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+    const texte = document.createElement('span');
+    texte.className = 'bandeau-texte';
+    texte.textContent = `Brouillon · ${heure}`;
+    texte.title = `Modifications locales non publiées, enregistrées le `
+      + `${date.toLocaleDateString('fr-FR')} à ${heure}.`;
 
     const retour = document.createElement('button');
     retour.type = 'button';
     retour.className = 'bandeau-action';
     retour.textContent = 'Revenir au publié';
+    retour.title = 'Abandonner le brouillon local et recharger les annotations publiées';
     retour.addEventListener('click', surRetourPublie);
 
     bandeau.append(texte, retour);
@@ -721,10 +749,8 @@ export class PanneauDroit {
 // A duplicated subtree must not reuse its ids: two layers sharing one id would
 // make every lookup ambiguous.
 function renommerRecursivement(calque) {
-  calque.id = crypto.randomUUID ? crypto.randomUUID() : 'c-' + Math.random().toString(36).slice(2, 11);
-  for (const element of calque.donnees?.elements || []) {
-    element.id = crypto.randomUUID ? crypto.randomUUID() : 'e-' + Math.random().toString(36).slice(2, 11);
-  }
+  calque.id = identifiant();
+  for (const element of calque.donnees?.elements || []) element.id = identifiant();
   for (const enfant of calque.enfants || []) renommerRecursivement(enfant);
   return calque;
 }

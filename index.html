@@ -208,43 +208,38 @@
       white-space: nowrap;
     }
 
-    .menu-ancre { position: relative; flex: 1 1 0; display: flex; }
-
-    .menu {
-      position: absolute;
-      top: calc(100% + 0.3rem);
-      left: 0;
-      z-index: 6;
-      display: none;
-      flex-direction: column;
-      min-width: 10rem;
-      padding: 0.25rem;
-      border: 1px solid var(--border);
-      border-radius: 0.6rem;
-      background: var(--panel);
-      backdrop-filter: blur(14px);
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
-    }
-
-    .menu.ouvert { display: flex; }
-
-    .menu-option {
-      display: flex;
+    /* Une rangée de symboles, pas de libellés : ces quatre actions reviennent
+       sans cesse et la place qu'elles prenaient manquait à la liste. */
+    .barre-actions {
       align-items: center;
-      gap: 0.5rem;
-      border: none;
-      border-radius: 0.4rem;
-      text-align: left;
-      font-size: 0.78rem;
-      padding: 0.4rem 0.5rem;
+      gap: 0.2rem;
     }
 
-    .menu-icone { width: 1rem; text-align: center; color: var(--muted); }
+    .barre-actions .bouton-action {
+      display: grid;
+      width: 2rem;
+      height: 2rem;
+      flex: 0 0 auto;
+      padding: 0;
+      place-items: center;
+    }
+
+    .bouton-action svg {
+      width: 1.05rem;
+      height: 1.05rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.35;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .barre-actions-separateur { flex: 1 1 auto; }
 
     /* --------------------------------------------------------- la liste */
 
     .calques-liste {
-      flex: 1 1 auto;
+      flex: 1 3 auto;
       min-height: 6rem;
       overflow-y: auto;
       margin: 0 -0.35rem;
@@ -289,19 +284,46 @@
     /* Out of scope for the session on screen: still there, just not concerned. */
     .calque.hors-portee .calque-nom { opacity: 0.45; text-decoration: line-through; }
 
+    /* Plier un groupe est une manœuvre courante : le chevron doit se voir et
+       s'attraper. À 0.6rem et en gris clair, il fallait le chercher. */
     .calque-chevron {
-      width: 0.9rem;
+      width: 1rem;
       padding: 0;
       border: none;
       background: none;
-      color: var(--muted);
-      font-size: 0.6rem;
+      color: var(--muted-fort, var(--muted));
+      font-size: 0.72rem;
       line-height: 1;
       text-align: center;
       flex: none;
     }
 
-    .calque-chevron:hover { background: none; }
+    .calque-chevron:hover { background: none; color: var(--accent); }
+
+    /* Le repère de profondeur. Une annotation est un calque comme un autre
+       maintenant, donc l'arbre se creuse vite ; sans ce filet vertical, deux
+       niveaux d'imbrication se distinguent à treize pixels d'écart et rien
+       d'autre. Un trait par niveau, posé dans la marge que la ligne s'est
+       déjà réservée. */
+    /* Chaque filet tombe sous le chevron du parent : 0.44rem de retrait de
+       ligne + 0.5rem pour le centre du chevron. Le pas est celui du retrait. */
+    .calque-guides {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0.94rem;
+      display: flex;
+      pointer-events: none;
+    }
+
+    .calque-guides span {
+      width: 0.85rem;
+      border-left: 1px solid color-mix(in srgb, var(--border-fort, var(--border)) 78%, transparent);
+    }
+
+    .calque.selectionne .calque-guides span {
+      border-left-color: color-mix(in srgb, var(--accent) 34%, transparent);
+    }
 
     .calque-oeil {
       display: flex;
@@ -327,17 +349,28 @@
       stroke-linejoin: round;
     }
 
+    /* Une plaque à la couleur du calque, et sur elle la silhouette de son
+       genre. La bordure intérieure sauve les couleurs claires : sans elle un
+       calque blanc disparaît dans le panneau, comme n'importe quel nuancier. */
     .calque-pastille {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.1rem;
-      height: 1.1rem;
+      display: block;
+      width: 1.15rem;
+      height: 1.15rem;
       flex: none;
-      border-radius: 0.28rem;
-      color: #fff;
-      font-size: 0.6rem;
-      line-height: 1;
+      border-radius: 0.3rem;
+      box-shadow: inset 0 0 0 1px var(--liseree-plaque, rgba(0, 0, 0, 0.16));
+    }
+
+    /* L'encre est blanche sur toutes les couleurs, sans exception : une marque
+       qui change de teinte se lit comme une autre marque. Ce liseré d'ombre est
+       ce qui la sauve sur un jaune pâle ou un calque blanc — invisible sur les
+       teintes soutenues, juste assez sur les claires. */
+    .calque-pastille svg,
+    .fiche-pastille svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 0 0.5px rgba(0, 0, 0, 0.55));
     }
 
     .calque-nom {
@@ -361,6 +394,32 @@
     }
 
     .calque-verrou { display: flex; width: 0.9rem; height: 0.9rem; color: var(--muted); flex: none; }
+
+    /* L'interrupteur d'étiquette, sur chaque ligne : c'est là qu'on décide
+       qu'une zone n'a pas besoin de dire son nom sur le spécimen. */
+    .calque-etiquette-bascule {
+      display: flex;
+      width: 1.15rem;
+      height: 1.15rem;
+      padding: 0;
+      border: none;
+      background: none;
+      color: var(--muted);
+      flex: none;
+    }
+
+    .calque-etiquette-bascule:hover { background: none; color: inherit; }
+    .calque-etiquette-bascule.inactive { opacity: 0.4; }
+
+    .calque-etiquette-bascule svg {
+      width: 100%;
+      height: 100%;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
 
     /* Only shown where dragging the row itself would be the scroll gesture. */
     .calque-poignee {
@@ -445,24 +504,52 @@
       border-top: 1px solid var(--border);
     }
 
+    /* Un filet, pas un encadré. L'état « brouillon » est vrai presque tout le
+       temps : il doit se signaler, pas s'imposer. */
     .bandeau-brouillon {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 0.4rem;
-      padding: 0.35rem 0.5rem;
-      border: 1px solid var(--border);
-      border-radius: 0.45rem;
-      background: var(--surbrillance);
+      padding: 0.1rem 0.1rem 0.1rem 0.15rem;
       color: var(--muted);
-      font-size: 0.7rem;
+      font-size: 0.66rem;
+    }
+
+    .bandeau-texte {
+      display: flex;
+      overflow: hidden;
+      align-items: center;
+      gap: 0.34rem;
+      min-width: 0;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* La pastille dit « non publié » sans le mot. */
+    .bandeau-texte::before {
+      content: '';
+      width: 0.4rem;
+      height: 0.4rem;
+      flex: none;
+      border-radius: 50%;
+      background: var(--danger, #c9553d);
     }
 
     .bandeau-action {
-      padding: 0.2rem 0.45rem;
-      font-size: 0.68rem;
+      padding: 0.1rem 0.2rem;
+      flex: none;
+      border-color: transparent;
+      background: transparent;
+      box-shadow: none;
+      color: var(--muted-fort, var(--muted));
+      font-size: 0.66rem;
+      text-decoration: underline;
+      text-underline-offset: 0.16em;
       white-space: nowrap;
     }
+
+    .bandeau-action:hover { background: transparent; color: var(--accent); }
 
     .panneau-pied { display: flex; flex: none; }
     .panneau-pied button { flex: 1 1 auto; font-size: 0.75rem; }
@@ -538,14 +625,56 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.13);
     }
 
-    /* Where the work will land. The one line that ties tool to layer. */
-    .reglages-cible {
+    .reglages-entete {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.4rem;
+    }
+
+    /* Une explication ne se lit qu'une fois. Elle reste disponible — derrière
+       ce « ? » — mais elle n'occupe plus le panneau pour toujours. L'état est
+       retenu d'une session à l'autre : qui les veut ouvertes les garde. */
+    .reglages-aide-bascule {
+      display: grid;
+      width: 1.05rem;
+      height: 1.05rem;
+      padding: 0;
+      flex: none;
+      place-items: center;
+      border-radius: 50%;
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .reglages-aide-bascule[aria-expanded="true"] {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 15%, transparent);
+      color: var(--text);
+    }
+
+    .reglages-aide {
       margin: 0;
-      padding: 0.3rem 0.45rem;
+      padding: 0.4rem 0.5rem;
       border-radius: 0.4rem;
       background: var(--surbrillance);
-      font-size: 0.72rem;
-      line-height: 1.3;
+      color: var(--muted-fort, var(--muted));
+      font-size: 0.68rem;
+      line-height: 1.45;
+    }
+
+    /* Where the work will land. The one line that ties tool to layer.
+       Une ligne, jamais deux : le nom déborde en points de suspension et la
+       phrase complète passe en infobulle. Le reste de l'allure — plaque,
+       liseré, pastille, états — est dans interface.css. */
+    .reglages-cible {
+      margin: 0;
+      overflow: hidden;
+      line-height: 1.35;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .modes button { padding: 0.3rem 0; font-size: 0.78rem; }
@@ -556,6 +685,33 @@
     .palette .swatch-custom input[type="color"] { width: 1.8rem; height: 1.8rem; }
 
     .reglages-outil .barre-calques button { padding: 0.3rem 0.4rem; }
+
+    .reglages-destination {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .reglages-destination .reglages-cible {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .reglages-nouveau {
+      flex: none;
+      padding: 0.22rem 0.5rem;
+      font-size: 0.68rem;
+      white-space: nowrap;
+    }
+
+    /* Armé, pas actif : le calque n'existe pas encore, il naîtra du geste
+       suivant. Le bouton reste enfoncé pour le dire. */
+    .reglages-nouveau[aria-pressed="true"] {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 16%, transparent);
+      color: var(--text);
+      font-weight: 600;
+    }
     #selCreerRegion { width: 100%; font-size: 0.74rem; }
 
     .trace-lasso {
@@ -579,6 +735,21 @@
       color: var(--muted);
       font-size: 0.68rem;
       line-height: 1.35;
+    }
+
+    /* Une touche se dessine comme une touche : sinon « Entrée » se lit comme
+       un mot de la phrase et le geste ne se voit pas. */
+    .raccourci {
+      display: inline-block;
+      padding: 0 0.24rem;
+      border: 1px solid var(--border-fort, var(--border));
+      border-bottom-width: 2px;
+      border-radius: 0.25rem;
+      background: var(--panel-fort, var(--panel));
+      color: var(--muted-fort, var(--text));
+      font-family: inherit;
+      font-size: 0.92em;
+      line-height: 1.5;
     }
 
     /* --------------------------------------------------------- mesures */
@@ -715,7 +886,10 @@
       width: max-content;
       min-width: 5rem;
       max-width: 14rem;
-      padding: 0.34rem 0.55rem;
+      /* La place à gauche est celle du symbole de genre : toutes les étiquettes
+         ont la même forme, et ce seul signe distingue une peinture d'une
+         annotation, d'une région ou d'une mesure. */
+      padding: 0.34rem 0.55rem 0.34rem 1.5rem;
       border: 1px solid color-mix(in srgb, var(--couleur, var(--accent)) 72%, #000000);
       border-radius: 0.48rem;
       background: var(--couleur, var(--accent));
@@ -758,6 +932,25 @@
       box-shadow: 0 0 0 1px color-mix(in srgb, var(--texte-etiquette) 42%, transparent);
     }
 
+    /* Discret par construction : assez lisible pour répondre à « d'où sort ce
+       chiffre ? », assez effacé pour ne pas concurrencer le nom. */
+    .epingle-etiquette-genre {
+      position: absolute;
+      top: 0.42rem;
+      left: 0.4rem;
+      width: 0.82rem;
+      height: 0.82rem;
+      opacity: 0.62;
+      pointer-events: none;
+    }
+
+    .epingle-etiquette-genre svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      color: var(--texte-etiquette, #ffffff);
+    }
+
     .epingle-etiquette-titre {
       display: block;
       overflow: hidden;
@@ -766,16 +959,79 @@
       white-space: nowrap;
     }
 
-    .epingle-description {
+    /* Le corps déplié. Au repos une étiquette est un nom ; sous le pointeur
+       elle répond : voilà à quoi ça ressemble, ce qui est dit, sur quels
+       chiffres, et avec quelle assurance. */
+    .epingle-detail {
       display: none;
-      overflow: hidden;
       max-width: 13rem;
+      margin-top: 0.3rem;
+      padding-top: 0.3rem;
+      border-top: 1px solid color-mix(in srgb, var(--texte-etiquette, #ffffff) 24%, transparent);
+    }
+
+    .epingle-etiquette.depliee .epingle-detail { display: block; }
+
+    /* La photographie d'une fissure règle d'un coup d'œil ce qu'une phrase à
+       son sujet plaide. Cadrée court : c'est un indice, pas la pièce. */
+    .epingle-vignette {
+      display: block;
+      width: 100%;
+      height: 4.6rem;
+      margin-bottom: 0.32rem;
+      border-radius: 0.32rem;
+      background: color-mix(in srgb, #000 18%, transparent);
+      object-fit: cover;
+    }
+
+    .epingle-description {
+      display: block;
+      overflow: hidden;
       color: color-mix(in srgb, var(--texte-etiquette, #ffffff) 82%, transparent);
       font-weight: 400;
       overflow-wrap: anywhere;
     }
 
-    .epingle-etiquette.depliee .epingle-description { display: block; }
+    .epingle-chiffres {
+      display: flex;
+      margin-top: 0.32rem;
+      flex-wrap: wrap;
+      gap: 0.22rem;
+    }
+
+    .epingle-chiffre {
+      padding: 0.06rem 0.3rem;
+      border-radius: 0.28rem;
+      background: color-mix(in srgb, var(--texte-etiquette, #ffffff) 17%, transparent);
+      font-size: 0.66rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .epingle-chiffre-cle {
+      opacity: 0.72;
+      font-weight: 400;
+    }
+
+    .epingle-chiffre-reste { opacity: 0.72; }
+
+    .epingle-qualification {
+      display: block;
+      margin-top: 0.3rem;
+      color: color-mix(in srgb, var(--texte-etiquette, #ffffff) 68%, transparent);
+      font-size: 0.65rem;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+
+    /* Les points supplémentaires d'un calque qui en porte plusieurs : le cas
+       des documents antérieurs, où une épingle n'était pas encore un calque. */
+    .epingle-point.secondaire {
+      width: 0.38rem;
+      height: 0.38rem;
+      margin: -0.19rem 0 0 -0.19rem;
+      opacity: 0.8;
+    }
 
     .epingle-point.cachee,
     .epingle-etiquette.cachee,
@@ -789,44 +1045,206 @@
     body[data-outil="mesure"] #scene canvas,
     body[data-outil="lasso"] #scene canvas { cursor: crosshair; }
 
-    /* Markers would only get in the way of painting or selecting. Measurement
-       figures stay: they are what the ruler is for. */
+    /* Ce qui gênait le pinceau, c'était de CAPTER le pointeur : un clic destiné
+       au spécimen atterrissait sur une pastille. La couche entière était donc
+       masquée pendant qu'on peint — ce qui, depuis que chaque calque porte son
+       étiquette, revient à effacer le nom de la zone qu'on est justement en
+       train de peindre. Elle reste visible et cesse seulement de répondre. */
     body[data-outil="pinceau"] #epingles,
     body[data-outil="gomme"] #epingles,
     body[data-outil="baguette"] #epingles,
-    body[data-outil="lasso"] #epingles { display: none; }
+    body[data-outil="lasso"] #epingles,
+    body[data-outil="pinceau"] #epingles *,
+    body[data-outil="gomme"] #epingles *,
+    body[data-outil="baguette"] #epingles *,
+    body[data-outil="lasso"] #epingles * { pointer-events: none; }
+
+    /* La pastille d'ancrage, elle, est posée là où l'outil travaille : elle
+       s'efface, l'étiquette et sa ligne de rappel restent. */
+    body[data-outil="pinceau"] .epingle-point,
+    body[data-outil="gomme"] .epingle-point,
+    body[data-outil="baguette"] .epingle-point,
+    body[data-outil="lasso"] .epingle-point { opacity: 0.35 !important; }
 
     /* ------------------------------------------------------------ fiche */
 
-    /* Takes over the panel: a photo and a paragraph need the room. The panel
-       background is translucent, so the list underneath is hidden outright
-       rather than covered — a card you can read the layer list through is
-       worse than either. */
-    .panneau-calques.fiche-ouverte > *:not(.fiche) { display: none; }
-
-    .fiche {
-      position: absolute;
-      inset: 0;
-      z-index: 2;
+    /* La fiche flotte au pied de la vue, centrée : c'est la bande où rien n'est
+       jamais annoté — le socle — et la seule place d'où elle ne cache ni le
+       spécimen, ni les deux panneaux, ni la pile de calques qu'elle décrit. */
+    .fiche-flottante {
+      position: fixed;
+      z-index: 40;
+      bottom: 0.75rem;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
       flex-direction: column;
-      gap: 0.6rem;
-      padding: 1rem 0.85rem;
+      width: min(36rem, calc(100vw - 2rem));
+      height: var(--hauteur-fiche, 300px);
+      max-height: 78vh;
+      padding: 0 0.75rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 0.9rem;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 10px 34px rgba(0, 0, 0, 0.18);
+    }
+
+    /* Le bord haut, saisissable : le bas est ancré, c'est la seule prise
+       possible. */
+    .fiche-poignee {
+      display: grid;
+      height: 0.85rem;
+      flex: none;
+      place-items: center;
+      margin: 0 -0.75rem;
+      cursor: ns-resize;
+      touch-action: none;
+    }
+
+    .fiche-poignee span {
+      width: 2.2rem;
+      height: 0.2rem;
+      border-radius: 999px;
+      background: var(--border);
+    }
+
+    .fiche-poignee:hover span,
+    .fiche-poignee.redimensionnement span { background: var(--accent); }
+
+    .fiche-corps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      min-height: 0;
+      flex: 1 1 auto;
       overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-top: 0.5rem;
     }
 
     .fiche-entete {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.4rem;
+      flex: none;
+      padding-bottom: 0.5rem;
     }
 
-    .fiche-retour {
-      padding: 0.25rem 0.55rem;
-      font-size: 0.72rem;
+    .fiche-pastille {
+      display: block;
+      width: 1.3rem;
+      height: 1.3rem;
+      flex: none;
+      border-radius: 0.34rem;
     }
 
-    .fiche-titre { font-weight: 600; }
+    .fiche-fermer {
+      display: grid;
+      width: 1.6rem;
+      height: 1.6rem;
+      flex: none;
+      padding: 0;
+      place-items: center;
+    }
+
+    .fiche-fermer svg {
+      width: 0.85rem;
+      height: 0.85rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.5;
+      stroke-linecap: round;
+    }
+
+    .fiche-titre {
+      flex: 1 1 auto;
+      min-width: 5rem;
+      font-weight: 600;
+    }
+
+    /* Nature et confiance : deux menus sur la ligne de titre, au lieu de trois
+       blocs empilés qui prenaient le quart de la fiche pour deux valeurs qu'on
+       règle une fois puis qu'on relit. */
+    .fiche-qualification {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      flex: none;
+    }
+
+    .fiche-select {
+      max-width: 7.5rem;
+      padding: 0.24rem 0.3rem;
+      border: 1px solid var(--border);
+      border-radius: 0.4rem;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 0.68rem;
+    }
+
+    .fiche-select-nature[data-nature="constat"] { color: #4f9066; border-color: color-mix(in srgb, #4f9066 45%, var(--border)); }
+    .fiche-select-nature[data-nature="interpretation"] { color: #3d7ab8; border-color: color-mix(in srgb, #3d7ab8 45%, var(--border)); }
+    .fiche-select-nature[data-nature="hypothese"] { color: #8360b8; border-color: color-mix(in srgb, #8360b8 45%, var(--border)); }
+    .fiche-select-nature[data-nature="preconisation"] { color: #d99a35; border-color: color-mix(in srgb, #d99a35 45%, var(--border)); }
+    .fiche-select-nature[data-nature="intervention"] { color: #c9553d; border-color: color-mix(in srgb, #c9553d 45%, var(--border)); }
+    .fiche-select-confiance { color: var(--muted); max-width: 6.5rem; }
+    .fiche-select-confiance[data-confiance="hypothetique"] { border-style: dashed; }
+
+    /* Les blocs secondaires : une ligne repliée tant qu'on ne les ouvre pas.
+       Ils comptent, mais ce n'est pas ce qu'on regarde en écrivant. */
+    .fiche-section {
+      border: 1px solid var(--border);
+      border-radius: 0.55rem;
+      flex: none;
+    }
+
+    .fiche-section > summary {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.32rem 0.5rem;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+
+    .fiche-section > summary::-webkit-details-marker { display: none; }
+
+    .fiche-section > summary::before {
+      content: '▸';
+      color: var(--muted);
+      font-size: 0.55rem;
+      transition: transform 140ms ease;
+    }
+
+    .fiche-section[open] > summary::before { transform: rotate(90deg); }
+
+    .fiche-section-titre {
+      flex: 1 1 auto;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .fiche-section-resume {
+      overflow: hidden;
+      max-width: 12rem;
+      color: var(--muted);
+      font-size: 0.66rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .fiche-section > *:not(summary) {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      padding: 0 0.5rem 0.5rem;
+    }
 
     .fiche-rendu {
       min-height: 4.5rem;
@@ -934,32 +1352,7 @@
 
     .fiche-actions { margin-top: auto; padding-top: 0.4rem; }
 
-    /* ------------------------------------------- nature, confiance, examen */
-
-    .fiche-qualification, .fiche-conditions, .fiche-vue {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
-
-    .fiche-natures {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.25rem;
-    }
-
-    .fiche-nature {
-      padding: 0.22rem 0.5rem;
-      font-size: 0.7rem;
-      border-radius: 999px;
-    }
-
-    .fiche-nature[aria-pressed="true"] {
-      border-color: var(--accent);
-      background: color-mix(in srgb, var(--accent) 16%, transparent);
-      color: var(--text);
-      font-weight: 600;
-    }
+    /* -------------------------------------------------- conditions d'examen */
 
     .fiche-champ-ligne {
       display: flex;
@@ -1056,6 +1449,286 @@
       margin: 0.2rem 0 0;
       color: var(--muted);
       font-size: 0.78rem;
+    }
+
+    /* ------------------------------------------------- fiche du projet */
+
+    .projet-voile {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: grid;
+      padding: 1.2rem;
+      place-items: center;
+      background: rgba(18, 24, 23, 0.42);
+      backdrop-filter: blur(3px);
+    }
+
+    .projet-feuille {
+      display: flex;
+      width: min(46rem, 100%);
+      max-height: min(84vh, 52rem);
+      flex-direction: column;
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      background: var(--panel-fort, var(--panel));
+      box-shadow: 0 1.6rem 4.5rem rgba(0, 0, 0, 0.3);
+    }
+
+    .projet-entete {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.8rem;
+      padding: 1rem 1.1rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .projet-identite { flex: 1 1 auto; min-width: 0; }
+
+    .projet-surtitre {
+      display: block;
+      color: var(--accent);
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    /* Le titre se saisit là où il s'affiche : pas de champ « Intitulé » plus
+       bas dans le formulaire pour redire ce qui est déjà en tête. */
+    .projet-titre {
+      width: 100%;
+      margin-top: 0.2rem;
+      padding: 0.1rem 0.3rem;
+      margin-left: -0.3rem;
+      border: 1px solid transparent;
+      border-radius: 0.4rem;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 1.12rem;
+      font-weight: 680;
+      letter-spacing: -0.02em;
+    }
+
+    .projet-titre:hover { border-color: var(--border); }
+    .projet-titre:focus { border-color: var(--accent); background: var(--background); }
+
+    /* Combien du dossier est retraçable. Un compte et un anneau, pas une
+       alarme : c'est un état d'avancement, pas une faute. */
+    .projet-jauge {
+      position: relative;
+      display: grid;
+      width: 2.5rem;
+      height: 2.5rem;
+      flex: none;
+      place-items: center;
+      border-radius: 50%;
+      background: conic-gradient(var(--accent) calc(var(--part, 0) * 360deg),
+        color-mix(in srgb, var(--border-fort) 45%, transparent) 0);
+    }
+
+    .projet-jauge::after {
+      content: '';
+      position: absolute;
+      width: 1.95rem;
+      height: 1.95rem;
+      border-radius: 50%;
+      background: var(--panel-fort, var(--panel));
+    }
+
+    /* Le disque central est un ::after, donc peint après le texte : sans cet
+       étage il le recouvre et la jauge n'affiche plus rien. */
+    .projet-jauge-texte {
+      position: relative;
+      z-index: 1;
+      font-size: 0.64rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .projet-jauge[data-complet="true"] .projet-jauge-texte { color: var(--accent); }
+
+    .projet-fermer {
+      display: grid;
+      width: 1.9rem;
+      height: 1.9rem;
+      flex: none;
+      padding: 0;
+      place-items: center;
+      border-color: transparent;
+      background: transparent;
+      box-shadow: none;
+      color: var(--muted-fort, var(--muted));
+    }
+
+    .projet-fermer svg {
+      width: 0.9rem;
+      height: 0.9rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+    }
+
+    .projet-corps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      overflow-y: auto;
+      padding: 0.5rem 1.1rem 1.1rem;
+      overscroll-behavior: contain;
+    }
+
+    .projet-bloc { border-bottom: 1px solid var(--border); }
+    .projet-bloc:last-child { border-bottom: 0; }
+
+    .projet-bloc-titre {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      margin: 0;
+      padding: 0.65rem 0.1rem;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 640;
+      list-style: none;
+    }
+
+    .projet-bloc-titre::-webkit-details-marker { display: none; }
+
+    .projet-bloc-aide {
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 400;
+    }
+
+    .projet-bloc-corps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+      padding: 0.15rem 0.1rem 0.9rem;
+    }
+
+    /* Deux colonnes tant qu'elles tiennent : un dossier se lit par blocs, pas
+       en une colonne de vingt lignes. */
+    .projet-grille {
+      display: grid;
+      gap: 0.7rem 0.9rem;
+      grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+    }
+
+    .projet-champ {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 0.22rem;
+    }
+
+    .projet-champ-large { grid-column: 1 / -1; }
+
+    .projet-champ-nom {
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 560;
+    }
+
+    .projet-champ input,
+    .projet-champ textarea {
+      width: 100%;
+      padding: 0.36rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 0.45rem;
+      background: var(--background);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.78rem;
+    }
+
+    .projet-champ textarea { resize: vertical; line-height: 1.45; }
+    .projet-champ input:focus,
+    .projet-champ textarea:focus { border-color: var(--accent); outline: none; }
+
+    .projet-intervenants {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .projet-intervenant {
+      display: grid;
+      align-items: center;
+      gap: 0.4rem;
+      grid-template-columns: 1fr 1fr auto;
+    }
+
+    .projet-intervenant input {
+      padding: 0.36rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 0.45rem;
+      background: var(--background);
+      color: var(--text);
+      font: inherit;
+      font-size: 0.78rem;
+    }
+
+    .projet-retirer {
+      display: grid;
+      width: 1.7rem;
+      height: 1.7rem;
+      padding: 0;
+      place-items: center;
+      border-color: transparent;
+      background: transparent;
+      box-shadow: none;
+      color: var(--muted);
+    }
+
+    .projet-retirer:hover { color: var(--danger, #c9553d); background: transparent; }
+
+    .projet-retirer svg {
+      width: 0.75rem;
+      height: 0.75rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.7;
+      stroke-linecap: round;
+    }
+
+    .projet-ajouter {
+      align-self: flex-start;
+      padding: 0.24rem 0.5rem;
+      font-size: 0.72rem;
+    }
+
+    /* Ce que l'outil sait déjà. Énoncé, jamais demandé : un champ qu'une
+       machine peut remplir est un champ qu'un humain peut se tromper. */
+    .projet-bloc-faits { border-bottom: 0; }
+
+    .projet-faits {
+      display: grid;
+      margin: 0;
+      gap: 0.3rem 0.9rem;
+      grid-template-columns: auto 1fr;
+      padding: 0.55rem 0.7rem;
+      border-radius: 0.6rem;
+      background: var(--surbrillance);
+      font-size: 0.72rem;
+    }
+
+    .projet-faits dt { color: var(--muted); }
+
+    .projet-faits dd {
+      margin: 0;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
+    }
+
+    @media (max-width: 720px) {
+      .projet-voile { padding: 0; }
+      .projet-feuille { max-height: 100vh; height: 100%; border-radius: 0; }
     }
 
     .group {
@@ -1274,18 +1947,36 @@
   <div class="barre-outils" id="barreOutils" role="toolbar" aria-label="Outils d’annotation"></div>
 
   <div class="reglages-outil" id="reglagesEpingle" hidden>
-    <span class="group-title">Annotation</span>
+    <div class="reglages-entete">
+      <span class="group-title">Annotation</span>
+      <button class="reglages-aide-bascule" id="aideEpingle" type="button" data-aide="epingle"
+        aria-expanded="false" aria-label="Aide sur l’outil annotation" title="Comment ça marche">?</button>
+    </div>
+    <p class="reglages-aide" hidden>Un clic sur le spécimen pose une annotation. Chacune
+      devient un calque, que vous pouvez nommer, décrire et masquer indépendamment.</p>
     <p class="reglages-cible" id="epingleCible"></p>
     <div class="field">
       <span class="field-label"><label>Couleur du calque</label></span>
       <div id="epinglePalette"></div>
     </div>
-    <p class="reglages-note">Un clic sur le spécimen pose une annotation.</p>
   </div>
 
   <div class="reglages-outil" id="reglagesPinceau" hidden>
-    <span class="group-title">Pinceau</span>
-    <p class="reglages-cible" id="pinceauCible"></p>
+    <div class="reglages-entete">
+      <span class="group-title">Pinceau</span>
+      <button class="reglages-aide-bascule" id="aidePinceau" type="button" data-aide="pinceau"
+        aria-expanded="false" aria-label="Aide sur l’outil pinceau" title="Comment ça marche">?</button>
+    </div>
+    <p class="reglages-aide" hidden>Le trait va dans le calque indiqué ci-dessous.
+      « Nouveau » n’en crée pas un tout de suite : il arme le geste suivant, pour
+      qu’un calque n’existe jamais sans qu’on ait peint dedans. Pour reprendre une
+      peinture, cliquez sa ligne dans le panneau des calques.</p>
+    <!-- Où va le trait, et comment en commencer un ailleurs. -->
+    <div class="reglages-destination">
+      <p class="reglages-cible" id="pinceauCible"></p>
+      <button class="reglages-nouveau" id="pinceauNouveau" type="button" aria-pressed="false"
+        title="Commencer une nouvelle peinture : le prochain trait créera son calque">Nouveau</button>
+    </div>
     <div class="field">
       <span class="field-label">
         <label for="pinceauTaille">Taille</label>
@@ -1307,7 +1998,13 @@
   </div>
 
   <div class="reglages-outil" id="reglagesGomme" hidden>
-    <span class="group-title">Gomme</span>
+    <div class="reglages-entete">
+      <span class="group-title">Gomme</span>
+      <button class="reglages-aide-bascule" id="aideGomme" type="button" data-aide="gomme"
+        aria-expanded="false" aria-label="Aide sur la gomme" title="Comment ça marche">?</button>
+    </div>
+    <p class="reglages-aide" hidden>Efface la peinture du calque indiqué ci-dessous.
+      Le geste reste annulable : rien n’est supprimé.</p>
     <p class="reglages-cible" id="gommeCible"></p>
     <div class="field">
       <span class="field-label">
@@ -1323,13 +2020,23 @@
       </span>
       <input type="range" id="gommeDurete" min="0" max="1" step="0.05" value="0.55">
     </div>
-    <p class="reglages-note">Efface la peinture du calque ci-dessus. Le geste
-      reste annulable : rien n’est supprimé.</p>
   </div>
 
   <div class="reglages-outil" id="reglagesSelection" hidden>
-    <span class="group-title" id="selTitre">Sélection</span>
-    <p class="reglages-cible" id="selCible"></p>
+    <div class="reglages-entete">
+      <span class="group-title" id="selTitre">Sélection</span>
+      <button class="reglages-aide-bascule" id="aideSelection" type="button" data-aide="selection"
+        aria-expanded="false" aria-label="Aide sur la sélection" title="Comment ça marche">?</button>
+    </div>
+    <p class="reglages-aide" hidden>Sélectionnez des faces sur le spécimen, puis
+      « Créer la région » pour en faire un calque. La baguette étend la sélection
+      aux faces voisines tant que l’angle reste sous la limite ; le lasso prend
+      tout ce que le tracé entoure.</p>
+    <div class="reglages-destination">
+      <p class="reglages-cible" id="selCible"></p>
+      <button class="reglages-nouveau" id="selNouveau" type="button" aria-pressed="false"
+        title="Commencer une nouvelle région : la prochaine sélection créera son calque">Nouveau</button>
+    </div>
 
     <div class="field">
       <span class="field-label"><label>Combinaison</label></span>
@@ -1367,8 +2074,19 @@
   </div>
 
   <div class="reglages-outil" id="reglagesMesure" hidden>
-    <span class="group-title">Mesure</span>
-    <p class="reglages-cible" id="mesureCible"></p>
+    <div class="reglages-entete">
+      <span class="group-title">Mesure</span>
+      <button class="reglages-aide-bascule" id="aideMesure" type="button" data-aide="mesure"
+        aria-expanded="false" aria-label="Aide sur la mesure" title="Comment ça marche">?</button>
+    </div>
+    <p class="reglages-aide" hidden>Cliquez les points du trajet sur le spécimen,
+      puis « Terminer ». « Droite » mesure à vol d’oiseau, comme un pied à coulisse ;
+      « Surface » suit le maillage, comme un mètre ruban.</p>
+    <div class="reglages-destination">
+      <p class="reglages-cible" id="mesureCible"></p>
+      <button class="reglages-nouveau" id="mesureNouveau" type="button" aria-pressed="false"
+        title="Commencer un nouveau calque de mesure : la prochaine mesure le créera">Nouveau</button>
+    </div>
 
     <div class="field">
       <span class="field-label"><label>Trajet</label></span>
@@ -1418,11 +2136,16 @@
           <circle cx="19.4" cy="14.1" r="1"/>
         </svg>
       </div>
-      <div class="title-group">
+      <!-- L'identité du document était déjà écrite ici : elle devient la porte
+           de sa fiche, plutôt que d'ajouter un bouton ailleurs pour dire la
+           même chose. -->
+      <button class="title-group" id="ouvrirProjet" type="button"
+        title="Ouvrir la fiche du projet — objet, intervenants, campagne, méthode">
         <span class="panel-kicker">Atelier d’observation 3D</span>
         <h1 id="projectTitle">Dactylopterus Volantis</h1>
         <p id="projectSubtitle">Chargement…</p>
-      </div>
+        <span class="projet-appel" id="projetAppel" hidden></span>
+      </button>
     </header>
 
     <div class="group panel-section" data-section="sessions">
@@ -1466,13 +2189,18 @@
 
       <!-- Visible seulement en éclairage dirigé. -->
       <div class="reglages-lumiere" id="reglagesLumiere" hidden>
-        <div id="disqueLumiere"></div>
-        <p class="reglages-note">
+        <div class="reglages-entete">
+          <span class="group-title">Direction</span>
+          <button class="reglages-aide-bascule" id="aideLumiere" type="button" data-aide="lumiere"
+            aria-expanded="false" aria-label="Aide sur la lumière dirigée" title="Comment ça marche">?</button>
+        </div>
+        <p class="reglages-aide" hidden>
           Tirez le point vers le bord pour une lumière rasante : c’est elle qui
           révèle le relief des écailles et des rayons. La direction est gardée
           par rapport au point de vue, donc l’effet tient quand vous tournez le
           spécimen.
         </p>
+        <div id="disqueLumiere"></div>
         <div class="field">
           <span class="field-label">
             <label for="lightKeyRange">Force de la source</label>
@@ -1535,18 +2263,21 @@
 
     <div class="bandeau-brouillon" id="bandeauBrouillon" hidden></div>
 
-    <div class="barre-calques">
-      <div class="menu-ancre">
-        <button class="action-principale" id="nouveauCalque" type="button" aria-haspopup="true">+ Nouveau calque</button>
-        <div class="menu" id="menuTypes" role="menu"></div>
-      </div>
-      <button id="nouveauGroupe" type="button">Nouveau groupe</button>
-    </div>
-
-    <div class="barre-calques">
-      <button id="dupliquerCalque" type="button" disabled>Dupliquer</button>
-      <button id="fusionnerCalque" type="button" disabled title="Fusionner avec le calque du dessous">Fusionner</button>
-      <button class="action-dangereuse" id="supprimerCalque" type="button" disabled>Supprimer</button>
+    <!-- Des symboles plutôt que des libellés : ces actions sont fréquentes et
+         connues, et la place qu'elles prenaient manquait à la liste. Les
+         calques ne se créent plus à la main — un outil crée le sien au premier
+         geste — donc seul le groupe reste à créer ici. -->
+    <div class="barre-calques barre-actions" role="toolbar" aria-label="Actions sur les calques">
+      <button class="bouton-action" id="nouveauGroupe" type="button" title="Nouveau groupe (Ctrl+G)" aria-label="Nouveau groupe">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2.6 6.2V15a1 1 0 0 0 1 1h12.8a1 1 0 0 0 1-1V7.6a1 1 0 0 0-1-1h-6L8.6 4.6a1 1 0 0 0-.7-.3H3.6a1 1 0 0 0-1 1Z"/></svg>
+      </button>
+      <button class="bouton-action" id="dupliquerCalque" type="button" title="Dupliquer le calque" aria-label="Dupliquer le calque" disabled>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="3.4" width="9.6" height="9.6" rx="1.4"/><path d="M13 16.6H4.8a1.4 1.4 0 0 1-1.4-1.4V7"/></svg>
+      </button>
+      <span class="barre-actions-separateur" aria-hidden="true"></span>
+      <button class="bouton-action action-dangereuse" id="supprimerCalque" type="button" title="Supprimer le calque (Suppr)" aria-label="Supprimer le calque" disabled>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.8 5.6h12.4"/><path d="M8.2 5.6V4.2a1 1 0 0 1 1-1h1.6a1 1 0 0 1 1 1v1.4"/><path d="M5.4 5.6 6 15.4a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l.6-9.8"/><path d="M8.6 8.4v5M11.4 8.4v5"/></svg>
+      </button>
     </div>
 
     <div class="calques-liste" id="calquesListe"></div>
@@ -1569,16 +2300,24 @@
     <div class="inspecteur" id="inspecteur"></div>
 
     <div class="panneau-pied">
-      <button id="exporterAnnotations" type="button" title="Télécharger les annotations">Exporter les annotations</button>
+      <button id="exporterAnnotations" type="button"
+        title="Télécharger les annotations de ce document">Exporter</button>
       <button id="importerAnnotations" type="button"
-        title="Charger un profil d’annotation (.json ou .zip) — remplace les calques actuels">Importer un profil</button>
+        title="Charger un profil d’annotation (.json ou .zip) — remplace les calques actuels">Importer</button>
       <!-- Le champ reste hors flux : c'est le bouton au-dessus qui l'ouvre. -->
       <input id="fichierImport" type="file" hidden
         accept=".json,.zip,application/json,application/zip">
     </div>
-
-    <div class="fiche" id="fiche" hidden></div>
   </aside>
+
+  <!-- La fiche flotte au pied de la vue plutôt que d'occuper le panneau : on
+       décrit ce qu'on regarde, et une fiche qui masque la pile de calques
+       oblige à la fermer pour savoir où l'on se trouve. -->
+  <div class="fiche fiche-flottante" id="fiche" role="dialog" aria-label="Fiche descriptive" hidden></div>
+
+  <!-- La fiche du projet s'ouvre par-dessus la vue : la remplir est un mode à
+       part, où l'on cesse de regarder le spécimen pour regarder le dossier. -->
+  <div class="projet-voile" id="projetVoile" hidden></div>
 
   <script type="module" src="./src/app.js"></script>
 </body>

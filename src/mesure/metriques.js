@@ -13,6 +13,7 @@
 import { aireFaces, perimetreFaces, volumePatch, volumeModele, aireModele }
   from './geometrie.js';
 import { MesureRaster } from './rasterisation.js';
+import { calquePorte } from '../document/modele.js';
 
 export class Metrologie {
   constructor(renderer, config, { atlas, regions }) {
@@ -47,15 +48,22 @@ export class Metrologie {
     return `${calque.donnees?.elements.length ?? 0}/${n}`;
   }
 
+  // Which route to take is decided by what the layer holds, not by what it is
+  // called — a merge can put strokes and regions in one layer, and it is the
+  // strokes that decide, because the exact route cannot see them at all.
   mesurer(calque, capture) {
     if (!capture || !calque?.donnees) return null;
+    const aDesTraces = calquePorte(calque, 'trace');
+    const aDesRegions = calquePorte(calque, 'region');
+    if (!aDesTraces && !aDesRegions) return null;
+
     const cle = `${calque.id}:${capture.cle}:${this._signature(calque)}`;
     const memoire = this.cache.get(cle);
     if (memoire) return memoire;
 
-    const resultat = calque.type === 'region'
-      ? this._region(calque, capture)
-      : this._peinture(calque, capture);
+    const resultat = aDesTraces
+      ? this._peinture(calque, capture)
+      : this._region(calque, capture);
 
     if (resultat) {
       this.apprendreIncertitude(resultat);
@@ -65,7 +73,7 @@ export class Metrologie {
   }
 
   facesDepuisPeinture(calque, capture) {
-    if (!capture || calque?.type !== 'peinture') return new Set();
+    if (!capture || !calquePorte(calque, 'trace')) return new Set();
     const entree = this.regions.capture(capture.cle);
     if (!entree) return new Set();
     return this.raster.facesCouvertes(this.atlas, capture, calque, entree.analyse);
@@ -115,7 +123,6 @@ export class Metrologie {
   }
 
   _peinture(calque, capture) {
-    if ((calque.donnees.elements.length ?? 0) === 0) return null;
     const releve = this.raster.mesurer(this.atlas, capture, calque);
     if (!releve) return null;
     const { aire, perimetre } = releve;

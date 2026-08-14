@@ -14,6 +14,7 @@ import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { faceLaPlusProche, trajet, milieuTrajet } from '../mesure/trajet.js';
 import { formaterLongueur } from '../mesure/metriques.js';
+import { elementsDuGenre } from '../document/modele.js';
 
 const BUDGET_RAYONS = 3;
 
@@ -94,13 +95,13 @@ export class CoucheMesures {
 
     if (capture) {
       for (const { calque } of doc.aplatir()) {
-        if (calque.type !== 'mesure' || !calque.donnees) continue;
+        if (!calque.donnees) continue;
+        const mesures = elementsDuGenre(calque, 'mesure');
+        if (mesures.length === 0) continue;
         if (!doc.visibleEffectivement(calque.id)) continue;
         if (!doc.concerneSession(calque, capture.session)) continue;
-        if (calque.donnees.elements.length === 0) continue;
 
-        vus.add(calque.id);
-        this._rendreCalque(calque, capture, entree);
+        this._rendreCalque(calque, mesures, capture, entree, vus);
       }
     }
 
@@ -116,12 +117,12 @@ export class CoucheMesures {
     this.majPositions();
   }
 
-  _rendreCalque(calque, capture, entree) {
+  _rendreCalque(calque, mesures, capture, entree, vus) {
     const segments = [];
 
-    for (const element of calque.donnees.elements) {
+    for (const element of mesures) {
       if (!element.points || element.points.length < 2) continue;
-      const trace = this.trace(element, entree,capture.cle);
+      const trace = this.trace(element, entree, capture.cle);
 
       for (const segment of trace.segments) {
         for (let i = 0; i < segment.points.length - 1; i++) {
@@ -140,6 +141,7 @@ export class CoucheMesures {
       }
     }
 
+    vus.add(calque.id);
     let entreeLigne = this.lignes.get(calque.id);
     if (!entreeLigne) {
       const materiau = this._materiau(calque.couleur);

@@ -8,13 +8,17 @@ import { OmbreContact } from './viewer/ombre.js';
 import { chargerModele, appliquerMatiere } from './viewer/modeles.js';
 import { configurerAR } from './viewer/ar.js';
 import { installerPanneau, exclusiviteMobile } from './ui/panneaux.js';
-import { DocumentAnnotation, creerCalque, creerEpingle } from './document/modele.js';
+import {
+  DocumentAnnotation, creerCalque, creerEpingle, calquePorte, genreElement, identifiant,
+  ficheRenseignee, projetRenseigne, REPERE, VERSION,
+} from './document/modele.js';
+import { FicheProjet } from './ui/projet.js';
 import { PileCommandes } from './document/commandes.js';
 import { chargerBrouillon, chargerPublie, supprimerBrouillon, SauvegardeDifferee } from './document/stockage.js';
 import { PanneauDroit } from './ui/panneau-droit.js';
 import { BarreOutils } from './ui/barre-outils.js';
 import { Pointeur } from './viewer/pointage.js';
-import { CoucheEpingles } from './annotations/epingles.js';
+import { CoucheEtiquettes } from './annotations/etiquettes.js';
 import { BibliothequeMedias } from './annotations/medias.js';
 import { Pinceau } from './annotations/pinceau.js';
 import { AtlasPeinture } from './peinture/atlas.js';
@@ -46,6 +50,10 @@ const elements = {
   listeSessions: $('#sessionList'),
   statut: $('#viewerStatus'),
   sousTitre: $('#projectSubtitle'),
+  titre: $('#projectTitle'),
+  ouvrirProjet: $('#ouvrirProjet'),
+  projetAppel: $('#projetAppel'),
+  projetVoile: $('#projetVoile'),
   pastilles: $('#bgSwatches'),
   fondPerso: $('#bgCustom'),
   intensite: $('#intensityRange'),
@@ -76,13 +84,11 @@ const elementsCalques = {
   poigneeInspecteur: $('#poigneeInspecteur'),
   inspecteurBascule: $('#inspecteurBascule'),
   inspecteurBasculeTexte: $('#inspecteurBasculeTexte'),
+  // The card is no longer part of the panel: it floats at the foot of the view.
   fiche: $('#fiche'),
   bandeau: $('#bandeauBrouillon'),
-  menu: $('#menuTypes'),
-  nouveauCalque: $('#nouveauCalque'),
   nouveauGroupe: $('#nouveauGroupe'),
   dupliquer: $('#dupliquerCalque'),
-  fusionner: $('#fusionnerCalque'),
   supprimer: $('#supprimerCalque'),
   annuler: $('#annulerBouton'),
   retablir: $('#retablirBouton'),
@@ -281,21 +287,23 @@ const panneauDroit = new PanneauDroit(elementsCalques, {
   couleurs: config.couleurs,
 });
 
-const coucheEpingles = new CoucheEpingles($('#epingles'), scene3d, pointeur, {
+const coucheEtiquettes = new CoucheEtiquettes($('#epingles'), scene3d, pointeur, {
   document: documentAnnotation,
-  surSelection: (idEpingle, idCalque) => {
-    panneauDroit.ouvrirFiche(idEpingle, idCalque);
-  },
+  surSelection: (idCalque) => panneauDroit.ouvrirFiche(idCalque),
+  // Region faces are indices into a mesh; only the region manager can turn a
+  // layer's face set into a point on the capture currently on screen.
+  ancrageRegion: (calque) => regions.centre(calque, captureCourante?.cle),
+  // So an unfolded label can show the photograph its card is about.
+  medias: bibliotheque,
 });
-panneauDroit.surSelectionElement = (idEpingle) => coucheEpingles.selectionner(idEpingle);
 panneauDroit.surDemandeOuverture = () => panneaux.droite.definirOuvert(true);
 
 // The markers and the measurement figures are DOM, so they are repositioned
 // after every frame that the on-demand renderer actually draws.
 scene3d.apresRendu = (cameraChangee) => {
-  const epinglesAContinuer = coucheEpingles.majPositions(cameraChangee);
+  const etiquettesAContinuer = coucheEtiquettes.majPositions(cameraChangee);
   const mesuresAContinuer = coucheMesures.majPositions(cameraChangee);
-  return epinglesAContinuer || mesuresAContinuer;
+  return etiquettesAContinuer || mesuresAContinuer;
 };
 
 // Separate fingerprints keep visual changes away from geometry caches. Paint
@@ -322,23 +330,40 @@ function signaturesRenduDocument(doc) {
       const opacite = opaciteParente
         * (Number.isFinite(propre) ? Math.max(0, Math.min(1, propre)) : 1);
       const portee = [...portees, calque.portee ?? 'toutes'];
-      if (calque.type === 'peinture' || calque.type === 'region' || calque.type === 'mesure') {
-        const elements = (calque.donnees?.elements ?? []).map((element) => {
+      const tous = calque.donnees?.elements ?? [];
+      if (tous.length > 0) {
+        // Grouped by what each element IS, not by what the layer is called. A
+        // merged layer feeds several of these lists at once, and a stroke added
+        // to it must not invalidate the region geometry cache alongside.
+        const parGenre = { trace: [], region: [], mesure: [] };
+        for (const element of tous) {
+          const genre = genreElement(element);
+          if (!(genre in parGenre)) continue;
           const donnees = element.empreintes ?? element.faces ?? element.points ?? [];
-          return [element.id, donnees.length, donnees[0], donnees[Math.floor(donnees.length / 2)],
-            donnees.at(-1), element.mode,
-            element.efface, element.durete, element.seuilNormale];
-        });
-        const contenu = JSON.stringify(elements);
-        const ligneRendu = JSON.stringify([calque.id, calque.type, visible, calque.couleur,
-          opacite, calque.fusion, calque.contour, portee]) + contenu;
-        rendu.push(ligneRendu);
-        if (calque.type === 'peinture' || calque.type === 'region') {
-          atlas.push(ligneRendu);
-          metriques.push(`${calque.id}|${calque.type}|${contenu}`);
+          parGenre[genre].push([element.id, element.couleur, donnees.length, donnees[0],
+            donnees[Math.floor(donnees.length / 2)], donnees.at(-1), element.mode,
+            element.efface, element.durete, element.seuilNormale]);
         }
-        if (calque.type === 'region') geometrieRegions.push(`${calque.id}|${contenu}`);
-        if (calque.type === 'mesure') trajetsMesures.push(`${calque.id}|${contenu}`);
+
+        const peints = [...parGenre.trace, ...parGenre.region];
+        const contenuPeint = JSON.stringify(peints);
+        const contenuMesures = JSON.stringify(parGenre.mesure);
+        const entete = JSON.stringify([calque.id, visible, calque.couleur,
+          opacite, calque.fusion, calque.contour, portee]);
+
+        if (peints.length > 0) {
+          const ligneRendu = entete + contenuPeint;
+          rendu.push(ligneRendu);
+          atlas.push(ligneRendu);
+          metriques.push(`${calque.id}|${contenuPeint}`);
+        }
+        if (parGenre.region.length > 0) {
+          geometrieRegions.push(`${calque.id}|${JSON.stringify(parGenre.region)}`);
+        }
+        if (parGenre.mesure.length > 0) {
+          rendu.push(entete + contenuMesures);
+          trajetsMesures.push(`${calque.id}|${contenuMesures}`);
+        }
       }
       if (calque.enfants) visiter(calque, visible, opacite, portee);
     }
@@ -361,8 +386,8 @@ let derniereSignatureTrajets = null;
 let revisionAtlas = 0;
 
 panneauDroit.surChangementDocument = (idSelection) => {
-  coucheEpingles.definirDocument(panneauDroit.doc);
-  coucheEpingles.selectionner(idSelection);
+  coucheEtiquettes.definirDocument(panneauDroit.doc);
+  coucheEtiquettes.selectionner(idSelection);
   scene3d.demanderRendu();
   const signatures = signaturesRenduDocument(panneauDroit.doc);
   const renduModifie = signatures.rendu !== derniereSignatureRendu;
@@ -397,17 +422,19 @@ const metrologie = new Metrologie(scene3d.renderer, config, { atlas, regions });
 const coucheMesures = new CoucheMesures($('#mesures'), scene3d, pointeur, config);
 const outilMesure = new OutilMesure(pointeur, config);
 
-atlas.fournirRegion = (calque, cle) => regions.geometrieUV(calque, cle);
+atlas.fournirRegion = (calque, cle, elements) => regions.geometrieUV(calque, cle, elements);
 
 // During an opacity drag, update only the selected paint/region layer. The
 // definitive change still goes through the normal undoable document mutation
 // and recomposes every required capture once.
 panneauDroit.surApercuDocument = (detail) => {
   const calque = detail?.idCalque ? panneauDroit.doc.trouver(detail.idCalque) : null;
-  if (detail?.type === 'opacite' && calque
-    && (calque.type === 'peinture' || calque.type === 'region')
+  const peint = calque && (calquePorte(calque, 'trace') || calquePorte(calque, 'region'));
+  if (detail?.type === 'opacite' && peint
     && atlas.previsualiserOpacite(panneauDroit.doc, calque.id)) {
-    if (calque.type === 'region') contours.rafraichir(panneauDroit.doc, regions, captureCourante);
+    if (calquePorte(calque, 'region')) {
+      contours.rafraichir(panneauDroit.doc, regions, captureCourante);
+    }
     scene3d.demanderRendu();
     return;
   }
@@ -415,7 +442,7 @@ panneauDroit.surApercuDocument = (detail) => {
   // Annotation and measurement opacity is already cheap. Group opacity is
   // reflected in these lightweight layers while its flattened paint atlas is
   // committed once when the slider is released.
-  coucheEpingles.definirDocument(panneauDroit.doc);
+  coucheEtiquettes.definirDocument(panneauDroit.doc);
   contours.rafraichir(panneauDroit.doc, regions, captureCourante);
   coucheMesures.rafraichir(panneauDroit.doc, captureCourante,
     regions.capture(captureCourante?.cle));
@@ -529,12 +556,25 @@ outilMesure.surChangement = () => {
   scene3d.demanderRendu();
 
   const poses = outilMesure.points.length;
-  elementsMesure.etat.textContent = poses === 0
+  const texteMesure = poses === 0
     ? 'Cliquez un premier point sur le spécimen.'
     : (apercuMesure
       ? `${formaterLongueur(apercuMesure.longueur, echelle())}${apercuMesure.provisoire ? '…' : ''}`
         + ` · ${poses} point${poses > 1 ? 's' : ''} posé${poses > 1 ? 's' : ''}`
       : 'Cliquez un deuxième point.');
+  // The key that ends the measurement, said where and when it can be used —
+  // it lived in a button's tooltip, which is the one place nobody looks while
+  // clicking points on a specimen.
+  majEtat(elementsMesure.etat, texteMesure, poses >= 2 ? 'pour terminer' : null);
+
+  // And on the view itself, like a selection in progress. Points laid on a
+  // specimen with no visible way to close them read as a dead end, exactly the
+  // way highlighted faces did — the eye is on the model, not on the panel.
+  afficherStatut(poses === 0
+    ? ''
+    : (poses === 1
+      ? 'Cliquez un deuxième point · Échap pour annuler'
+      : `${poses} points posés · Entrée pour valider la mesure · Échap pour annuler`));
 
   elementsMesure.retirer.disabled = !outilMesure.enCours;
   elementsMesure.terminer.disabled = poses < 2;
@@ -557,14 +597,15 @@ function terminerMesure() {
 
 // The palettes edit the colour of the layer the tool is aimed at, so colour is
 // chosen where the work happens rather than only in the inspector.
-function brancherPalette(hote, nom) {
+//
+// Choosing a colour is NOT a reason to create a layer. It used to be: the
+// swatch called `calqueCourant()`, which creates one when there is nothing to
+// aim at, so clicking through the palette to see the colours left a trail of
+// empty « Peinture » rows behind. The colour now waits in the workshop until
+// something is actually painted.
+function brancherPalette(hote, nom, genre) {
   const palette = creerPalette(config.couleurs, (couleur) => {
-    const id = atelier.calqueCourant();
-    if (!id) return;
-    panneauDroit.muter('Couleur du calque', () => {
-      const calque = panneauDroit.doc.trouver(id);
-      if (calque) calque.couleur = couleur;
-    });
+    atelier.definirCouleur(genre, couleur);
     majCibles();
   });
   hote.appendChild(palette);
@@ -624,9 +665,11 @@ for (const bouton of elementsSelection.modes.querySelectorAll('button')) {
 }
 
 outilSelection.surChangement = (selection) => {
-  elementsSelection.etat.textContent = selection.size === 0
-    ? 'Aucune sélection.'
-    : `${selection.size.toLocaleString('fr-FR')} faces sélectionnées.`;
+  majEtat(elementsSelection.etat,
+    selection.size === 0
+      ? 'Aucune sélection.'
+      : `${selection.size.toLocaleString('fr-FR')} faces sélectionnées.`,
+    selection.size === 0 ? null : 'pour créer la région');
   elementsSelection.creer.disabled = selection.size === 0;
   contours.montrerApercu(outilSelection.geometrie(), outilSelection.segments());
   scene3d.demanderRendu();
@@ -645,16 +688,155 @@ outilSelection.surChangement = (selection) => {
 // layer's colour.
 function majCibles() {
   const etiquette = atelier.etiquetteCible();
-  for (const elements of [elementsPinceau, elementsGomme, elementsEpingle, elementsMesure]) {
-    if (elements.cible) elements.cible.textContent = etiquette;
+  const cibles = [elementsPinceau, elementsGomme, elementsEpingle, elementsMesure]
+    .map((elements) => elements.cible)
+    .concat(elementsSelection.cible);
+  for (const cible of cibles) {
+    if (!cible) continue;
+    cible.textContent = etiquette.texte;
+    cible.title = etiquette.detail;
+    cible.dataset.etat = etiquette.etat;
   }
-  elementsSelection.cible.textContent = etiquette;
   elementsSelection.titre.textContent = barreOutils.actif === 'lasso' ? 'Lasso' : 'Baguette magique';
 
-  const type = atelier.typeDeLOutil();
-  const calque = type ? atelier.calqueUtilisable(type) : null;
-  for (const palette of Object.values(palettes)) palette.marquer(calque?.couleur ?? '');
+  const genre = atelier.genreDeLOutil();
+  const arme = atelier.nouveauArme;
+  for (const [id, genreBouton] of [['#pinceauNouveau', 'trace'], ['#selNouveau', 'region'],
+    ['#mesureNouveau', 'mesure']]) {
+    $(id)?.setAttribute('aria-pressed', String(arme && genre === genreBouton));
+  }
+
+  // The swatch that is lit is the colour the next gesture will use — the target
+  // layer's, or the one chosen in advance for the layer that does not exist yet.
+  const couleur = atelier.couleurCourante();
+  for (const palette of Object.values(palettes)) palette.marquer(couleur);
 }
+
+// A tool's state line, with the key that acts on it when there is one to act
+// with. The key appears only once the action is possible, which is what makes
+// it read as an offer rather than as documentation.
+function majEtat(hote, texte, libelleRaccourci = null) {
+  if (!hote) return;
+  hote.replaceChildren(document.createTextNode(texte));
+  if (!libelleRaccourci) return;
+  const touche = document.createElement('kbd');
+  touche.className = 'raccourci';
+  touche.textContent = 'Entrée';
+  hote.append(document.createTextNode(' · '), touche,
+    document.createTextNode(` ${libelleRaccourci}`));
+}
+
+/* -------------------------------------------------------- fiche projet */
+
+// What the application knows for certain, offered to the record as statements
+// rather than as fields.
+//
+// The frame stamp and the scale are the two that matter most: every coordinate
+// in this document was authored against that frame, and every length went
+// through that ratio. Someone re-reading the report in ten years needs both to
+// know what the figures mean — and neither is something a human should be
+// asked to retype.
+function faitsDuProjet() {
+  const faits = [];
+
+  faits.push({
+    cle: 'Repère géométrique',
+    valeur: REPERE,
+    aide: 'Toutes les coordonnées de ce document ont été posées dans ce repère. '
+      + 'Un document venu d’un autre repère est refusé au chargement.',
+  });
+
+  if (Number.isFinite(ECHELLE_MESURE) && ECHELLE_MESURE !== 1) {
+    const modele = Number(config.mesure.longueurModeleReference);
+    const reelle = Number(config.mesure.longueurReelleReference);
+    faits.push({
+      cle: 'Mise à l’échelle',
+      valeur: `${(reelle * 100).toFixed(1)} cm réels pour ${(modele * 100).toFixed(1)} cm `
+        + `du modèle (× ${ECHELLE_MESURE.toFixed(5)})`,
+      aide: 'Facteur appliqué une fois aux longueurs, deux fois aux aires, trois fois '
+        + 'aux volumes. Toute mesure de ce document en dépend.',
+    });
+  }
+
+  if (sessionsConnues.length > 0) {
+    faits.push({
+      cle: 'Captures',
+      valeur: sessionsConnues
+        .map((session) => `${session.label} (${session.date}${session.time ? `, ${session.time}` : ''})`)
+        .join(' · '),
+      aide: 'Les prises de vue déclarées par le projet, chargées ou non.',
+    });
+  }
+
+  const calques = panneauDroit.doc.aplatir().map(({ calque }) => calque);
+  const decrits = calques.filter((calque) => ficheRenseignee(calque.fiche)).length;
+  faits.push({
+    cle: 'Contenu',
+    valeur: `${calques.length} calque${calques.length > 1 ? 's' : ''} · `
+      + `${decrits} fiche${decrits > 1 ? 's' : ''} renseignée${decrits > 1 ? 's' : ''}`,
+  });
+
+  faits.push({ cle: 'Format du document', valeur: `version ${VERSION}` });
+  return faits;
+}
+
+const ficheProjet = new FicheProjet(elements.projetVoile, {
+  document: () => panneauDroit.doc,
+  surMutation: (nom, mutation) => panneauDroit.muter(nom, mutation),
+  faits: faitsDuProjet,
+});
+
+ficheProjet.surFermeture = () => majEnteteProjet();
+
+// The panel header IS the record's title once one has been written, and the
+// door to it either way. A document whose header is still empty says so —
+// quietly, because working without one is legitimate and handing one over
+// without one is not.
+function majEnteteProjet() {
+  const projet = panneauDroit.doc?.projet;
+  const titre = String(projet?.titre ?? '').trim();
+  if (titre) elements.titre.textContent = titre;
+  const vide = !projetRenseigne(projet);
+  elements.projetAppel.hidden = !vide;
+  elements.projetAppel.textContent = vide ? 'Fiche du projet à remplir' : '';
+}
+
+elements.ouvrirProjet.addEventListener('click', () => ficheProjet.basculer());
+majEnteteProjet();
+
+/* --------------------------------------------------------------- aides */
+
+// The « ? » next to each tool's name.
+//
+// The panels used to carry their explanations in full, permanently. They are
+// worth saying — how the eraser is undoable, why a grazing light shows the
+// scales — but they are read once and then re-read for years by anyone who
+// looks at the panel, and a paragraph of prose costs more room than the sliders
+// it sits between. So they fold away, closed by default, and whoever wants them
+// open keeps them open: the choice is remembered per panel.
+const CLE_AIDE = 'durair.aide.';
+
+function brancherAides(racine = document) {
+  for (const bascule of racine.querySelectorAll('.reglages-aide-bascule')) {
+    const aide = bascule.closest('.reglages-entete')?.nextElementSibling;
+    if (!aide?.classList.contains('reglages-aide')) continue;
+
+    const cle = CLE_AIDE + (bascule.dataset.aide ?? bascule.id ?? 'outil');
+    const appliquer = (ouvert, memoriser) => {
+      aide.hidden = !ouvert;
+      bascule.setAttribute('aria-expanded', String(ouvert));
+      if (!memoriser) return;
+      try { localStorage.setItem(cle, ouvert ? '1' : '0'); } catch { /* mode privé */ }
+    };
+
+    let memorise = null;
+    try { memorise = localStorage.getItem(cle); } catch { /* mode privé */ }
+    appliquer(memorise === '1', false);
+    bascule.addEventListener('click', () => appliquer(aide.hidden, true));
+  }
+}
+
+brancherAides();
 
 /* ------------------------------------------------------------ métriques */
 
@@ -674,9 +856,26 @@ const AIDE_INCERTITUDE = {
 // with its figure: a number printed without the condition under which it is
 // valid is worse than no number.
 panneauDroit.mesures = (calque) => {
-  if (calque.type === 'mesure') return relevesMesure(calque);
-  if (calque.type !== 'peinture' && calque.type !== 'region') return null;
+  // A merged layer can hold measurements AND an extent. Both are reported, the
+  // lengths first: they are what someone took by hand, the area is derived.
+  const lignes = [];
+  const notes = [];
+  const longueurs = calquePorte(calque, 'mesure') ? relevesMesure(calque) : null;
+  if (longueurs) lignes.push(...longueurs.lignes);
 
+  const etendue = (calquePorte(calque, 'trace') || calquePorte(calque, 'region'))
+    ? relevesEtendue(calque)
+    : null;
+  if (etendue) {
+    lignes.push(...etendue.lignes);
+    if (etendue.note) notes.push(etendue.note);
+  }
+
+  if (lignes.length === 0) return null;
+  return { lignes, note: notes.join(' ') || null };
+};
+
+function relevesEtendue(calque) {
   const releve = metrologie.mesurer(calque, captureCourante);
   if (!releve) return null;
 
@@ -743,11 +942,11 @@ panneauDroit.mesures = (calque) => {
       + 'C’est le cas normal d’une bande qui entoure la queue.');
   }
   return { lignes, note: notes.join(' ') || null };
-};
+}
 
 panneauDroit.surConversionRegion = async (calqueInitial) => {
   const calque = panneauDroit.doc.trouver(calqueInitial?.id);
-  if (!calque || calque.type !== 'peinture' || !captureCourante) {
+  if (!calque || !calquePorte(calque, 'trace') || !captureCourante) {
     afficherStatut('Conversion impossible : aucune capture active.');
     return false;
   }
@@ -768,7 +967,8 @@ panneauDroit.surConversionRegion = async (calqueInitial) => {
   region.portee = structuredClone(calque.portee ?? 'toutes');
   region.contour = true;
   region.donnees.elements.push({
-    id: crypto.randomUUID ? crypto.randomUUID() : `r-${Date.now().toString(36)}`,
+    id: identifiant(),
+    genre: 'region',
     faces: [...faces],
     session: captureCourante.session ?? sessionCourante?.id ?? null,
   });
@@ -790,12 +990,12 @@ panneauDroit.surConversionRegion = async (calqueInitial) => {
 panneauDroit.surLissageRegion = (calqueInitial) => {
   const id = calqueInitial?.id;
   const calque = panneauDroit.doc.trouver(id);
-  if (!calque || calque.type !== 'region') return false;
+  if (!calque || !calquePorte(calque, 'region')) return false;
 
   let resultat = null;
   panneauDroit.muter('Lisser la région', () => {
     const courant = panneauDroit.doc.trouver(id);
-    if (!courant || courant.type !== 'region') return;
+    if (!courant || !calquePorte(courant, 'region')) return;
     resultat = regions.lisser(courant);
     metrologie.invalider(courant.id);
   });
@@ -831,7 +1031,7 @@ function aireDUneEntite(entite, idCalque) {
   const enfants = entite.enfants ?? [];
   if (enfants.some((c) => c.id === idCalque)) return null;
 
-  const candidats = enfants.filter((c) => (c.type === 'peinture' || c.type === 'region')
+  const candidats = enfants.filter((c) => (calquePorte(c, 'trace') || calquePorte(c, 'region'))
     && !doc.contient(c.id, idCalque));
   if (candidats.length !== 1) return null;
 
@@ -888,7 +1088,7 @@ function residuRecalage() {
 // years the very same table reads as change instead, against a noise floor that
 // is now known rather than assumed.
 panneauDroit.comparaison = (calque) => {
-  if (calque.type !== 'peinture' && calque.type !== 'region') return null;
+  if (!calquePorte(calque, 'trace') && !calquePorte(calque, 'region')) return null;
   const chargees = sessionsConnues
     .map((session, index) => ({ session, capture: atlas.capture(cleCapture(session, index)) }))
     .filter(({ capture }) => capture && regions.capture(capture.cle));
@@ -953,7 +1153,8 @@ panneauDroit.comparaison = (calque) => {
 };
 
 function relevesMesure(calque) {
-  const elements = calque.donnees?.elements ?? [];
+  const elements = (calque.donnees?.elements ?? [])
+    .filter((element) => genreElement(element) === 'mesure');
   if (elements.length === 0) return null;
   const entree = regions.capture(captureCourante?.cle);
 
@@ -1035,7 +1236,9 @@ function creerRegion() {
     const calque = panneauDroit.doc.trouver(idCalque);
     if (!calque?.donnees) return;
     calque.donnees.elements.push({
-      id: crypto.randomUUID(), faces,
+      id: identifiant(),
+      genre: 'region',
+      faces,
       session: regions.idSession ?? captureCourante?.session ?? sessionCourante?.id ?? null,
     });
   });
@@ -1053,6 +1256,16 @@ window.addEventListener('resize', majResolutionContours);
 majResolutionContours();
 
 window.addEventListener('keydown', (evenement) => {
+  // The project sheet is modal, so its Escape comes first — and it is the one
+  // shortcut that must work from inside a field, since the whole screen is
+  // fields and nothing else would ever match.
+  if (evenement.key === 'Escape' && ficheProjet.ouverte) {
+    evenement.preventDefault();
+    evenement.target?.blur?.();
+    ficheProjet.fermer();
+    return;
+  }
+
   const cible = evenement.target;
   if (cible instanceof HTMLInputElement || cible instanceof HTMLTextAreaElement
     || cible instanceof HTMLSelectElement || cible?.isContentEditable) return;
@@ -1137,9 +1350,20 @@ panneauDroit.surSelectionCalque = (id) => {
   majCibles();
 };
 
-brancherPalette($('#epinglePalette'), 'epingle');
-brancherPalette($('#pinceauPalette'), 'pinceau');
-brancherPalette($('#mesurePalette'), 'mesure');
+brancherPalette($('#epinglePalette'), 'epingle', 'epingle');
+brancherPalette($('#pinceauPalette'), 'pinceau', 'trace');
+brancherPalette($('#mesurePalette'), 'mesure', 'mesure');
+
+// « Commencer ailleurs » : le bouton arme le geste suivant, il ne crée rien.
+for (const [id, genre] of [['#pinceauNouveau', 'trace'], ['#selNouveau', 'region'],
+  ['#mesureNouveau', 'mesure']]) {
+  $(id)?.addEventListener('click', () => {
+    atelier.demanderNouveauCalque(genre);
+    majCibles();
+  });
+}
+
+atelier.surChangement = () => majCibles();
 majCibles();
 
 let departPointeur = null;
@@ -1186,12 +1410,14 @@ toile.addEventListener('pointerdown', (evenement) => {
   }
 
   if (barreOutils.actif !== 'pinceau' && barreOutils.actif !== 'gomme') return;
-  // An eraser can only target existing paint. It must never manufacture an
-  // empty paint layer just because the first gesture in a document is erase.
-  const cibleExistante = atelier.calqueUtilisable('peinture');
-  if (barreOutils.actif === 'gomme' && !cibleExistante) return;
+  // An eraser can only target existing paint. It must never manufacture a
+  // layer, so it is the one tool that resolves its target itself; the brush
+  // goes through the workshop, which is where « start a new one » lives.
+  const gomme = barreOutils.actif === 'gomme';
+  const cibleExistante = atelier.calqueUtilisable('trace');
+  if (gomme && !cibleExistante) return;
   if (!pinceau.demarrer(evenement.clientX, evenement.clientY)) return;
-  const idCalque = cibleExistante?.id ?? atelier.calqueCourant();
+  const idCalque = gomme ? cibleExistante.id : atelier.calqueCourant();
   if (!idCalque) { pinceau.annuler(); return; }
   capturer(evenement.pointerId);
   atlas.debuterTrait(panneauDroit.doc, idCalque);
@@ -1331,18 +1557,48 @@ for (const nom of ['pointerup', 'pointercancel']) {
   });
 }
 
+// One annotation, one layer — and this is the whole reason the model changed.
+//
+// A pin used to be an item inside a layer that was also called an annotation,
+// so the panel showed « Annotations » and, indented under it, « Annotation 1 »,
+// at a depth that looked like the tree and was not. Now placing a pin creates
+// the layer it is: it can be renamed, coloured, hidden, grouped, merged and
+// described exactly like everything else, and there is one kind of row in the
+// panel again.
+//
+// The new layer lands beside whatever is selected, so a run of annotations made
+// inside a group stays in that group.
 function poserEpingle(x, y) {
   const touche = pointeur.surfaceSous(x, y);
   if (!touche) return;
 
-  const idCalque = atelier.calqueCourant();
   const epingle = creerEpingle(touche.position, touche.normale, sessionCourante?.id ?? null);
+  const calque = creerCalque('annotation');
+  calque.nom = panneauDroit.doc.nomDisponible('Annotation');
+  // The colour picked in the tool panel before there was anything to colour.
+  const couleur = atelier.couleursEnAttente.epingle;
+  if (couleur) calque.couleur = couleur;
+  calque.donnees.elements.push(epingle);
 
-  panneauDroit.muter('Poser une annotation', () => {
-    const calque = panneauDroit.doc.trouver(idCalque);
-    if (calque?.donnees) calque.donnees.elements.push(epingle);
-  });
-  panneauDroit.ouvrirFiche(epingle.id, idCalque);
+  const courant = panneauDroit.selection;
+  let idParent = null;
+  let index = null;
+  if (courant) {
+    if (courant.enfants && !panneauDroit.doc.verrouilleEffectivement(courant.id)) {
+      idParent = courant.id;
+      index = courant.enfants.length;
+    } else {
+      const parent = panneauDroit.doc.parentDe(courant.id);
+      if (parent) {
+        idParent = parent === panneauDroit.doc.racine ? null : parent.id;
+        index = parent.enfants.findIndex((c) => c.id === courant.id) + 1;
+      }
+    }
+  }
+
+  panneauDroit.muter('Poser une annotation',
+    () => panneauDroit.doc.ajouter(calque, idParent, index));
+  panneauDroit.ouvrirFiche(calque.id);
 }
 
 // One eased flight, used by everything that moves the camera on purpose.
@@ -1362,14 +1618,19 @@ function allerVers(cible, arrivee, duree = 450) {
   requestAnimationFrame(animer);
 }
 
-// Brings a pin into view: same distance, but looking at it from the direction
-// its surface faces, so it is never left behind the specimen.
-panneauDroit.surCentrage = (epingle) => {
-  if (!epingle) return;
-  const cible = new THREE.Vector3(...epingle.position);
-  const normale = new THREE.Vector3(...epingle.normale);
+// Brings a layer into view: same distance, but looking at its anchor from the
+// direction its surface faces, so it is never left behind the specimen. The
+// anchor is the same point the label hangs off, which is why this asks the
+// label layer rather than working it out a second time.
+panneauDroit.surCentrage = (calque) => {
+  const ancrage = calque && coucheEtiquettes.ancrageDe(calque);
+  if (!ancrage) return;
+  const cible = ancrage.position.clone();
   const distance = scene3d.camera.position.distanceTo(scene3d.controls.target);
-  allerVers(cible, cible.clone().addScaledVector(normale, distance));
+  const direction = ancrage.normale
+    ? ancrage.normale.clone()
+    : scene3d.camera.position.clone().sub(scene3d.controls.target).normalize();
+  allerVers(cible, cible.clone().addScaledVector(direction, distance));
 };
 
 /* ------------------------------------------------------- vue d’observation */
@@ -1457,6 +1718,7 @@ async function chargerAnnotations() {
   const appliquer = (donnees) => {
     panneauDroit.definirDocument(DocumentAnnotation.deserialiser(donnees));
     pile.vider();
+    majEnteteProjet();
   };
 
   if (brouillon) {
@@ -1573,7 +1835,7 @@ async function choisirSession(session, index, bouton) {
   // are stored as strokes rather than as pixels.
   definirCaptures([cleCapture(session, index)]);
   panneauDroit.definirSessionActive(session.id ?? null);
-  coucheEpingles.definirSessionActive(session.id ?? null);
+  coucheEtiquettes.definirSessionActive(session.id ?? null);
   elements.sousTitre.textContent = `${session.label} · ${session.date}, ${session.time}`;
 }
 
@@ -1618,7 +1880,7 @@ async function choisirComposite(sessions, bouton) {
   // Every capture is on screen at once, so no layer is out of scope.
   sessionCourante = null;
   panneauDroit.definirSessionActive(null);
-  coucheEpingles.definirSessionActive(null);
+  coucheEtiquettes.definirSessionActive(null);
   // All three atlases are recomposed, each in its own UV space. Painting and
   // measuring target the first, the frame all the others were aligned onto.
   definirCaptures(sessions.map((session, index) => cleCapture(session, index)));
@@ -1677,7 +1939,7 @@ window.DURAIR = {
   // config.affichage.vueInitiale.
   vueActuelle: () => scene3d.vueActuelle(),
   scene3d, eclairage, ombre, config, THREE, pile, panneauDroit,
-  coucheEpingles, barreOutils, pointeur, medias: bibliotheque, atlas, pinceau,
+  coucheEtiquettes, barreOutils, pointeur, medias: bibliotheque, atlas, pinceau,
   regions, contours, outilSelection, creerRegion,
   metrologie, coucheMesures, outilMesure, terminerMesure,
   get captureCourante() { return captureCourante; },

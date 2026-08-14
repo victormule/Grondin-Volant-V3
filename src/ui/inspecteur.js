@@ -1,6 +1,8 @@
 // Properties of the selected layer, at the foot of the right-hand panel.
 
-import { TYPES_CALQUE, NATURES, CONFIANCES, ficheRenseignee } from '../document/modele.js';
+import {
+  NATURES, CONFIANCES, ficheRenseignee, typeAffiche, calquePorte,
+} from '../document/modele.js';
 import { creerPalette } from './palette.js';
 
 export class Inspecteur {
@@ -25,6 +27,10 @@ export class Inspecteur {
     this.surOuvrirFiche = surOuvrirFiche || null;
     this.sessionActive = null;
     this.id = null;
+    // How many layers are lit in the panel. The inspector still edits one — the
+    // primary — but saying nothing about the others would make a multiple
+    // selection look like a single one that had lost track of itself.
+    this.nombreSelectionnes = 1;
   }
 
   definirSessionActive(id) {
@@ -41,8 +47,9 @@ export class Inspecteur {
     this.rendre();
   }
 
-  afficher(id) {
+  afficher(id, nombreSelectionnes = 1) {
     this.id = id;
+    this.nombreSelectionnes = Math.max(1, nombreSelectionnes);
     this.rendre();
   }
 
@@ -58,12 +65,18 @@ export class Inspecteur {
       return;
     }
 
-    const modele = TYPES_CALQUE[calque.type] || TYPES_CALQUE.annotation;
-
     const titre = document.createElement('span');
     titre.className = 'group-title';
-    titre.textContent = modele.libelle;
+    titre.textContent = typeAffiche(calque).libelle;
     this.conteneur.appendChild(titre);
+
+    if (this.nombreSelectionnes > 1) {
+      const note = document.createElement('p');
+      note.className = 'inspecteur-multiple';
+      note.textContent = `${this.nombreSelectionnes} calques sélectionnés — les propriétés `
+        + 'ci-dessous concernent le dernier cliqué. Les boutons du panneau agissent sur tous.';
+      this.conteneur.appendChild(note);
+    }
 
     this.conteneur.appendChild(this._champTexte('Nom', calque.nom, (valeur) => {
       if (valeur && valeur !== calque.nom) this.surMutation('Renommer', () => { calque.nom = valeur; });
@@ -86,7 +99,7 @@ export class Inspecteur {
       }
     }));
 
-    const etiquetteCouleur = calque.type === 'groupe' ? 'Couleur du repère' : 'Couleur';
+    const etiquetteCouleur = calque.enfants ? 'Couleur du repère' : 'Couleur';
     this.conteneur.appendChild(this._couleur(etiquetteCouleur, calque.couleur, (valeur) => {
       this.surMutation('Couleur', () => { calque.couleur = valeur; });
     }));
@@ -99,12 +112,11 @@ export class Inspecteur {
     const comparaison = this._relever('D’une capture à l’autre', () => this.comparaison?.(calque));
     if (comparaison) this.conteneur.appendChild(this._comparaison(comparaison));
 
-    if (calque.type === 'peinture' && (calque.donnees?.elements.length ?? 0) > 0
-      && !this.doc.verrouilleEffectivement(calque.id)) {
+    const modifiable = !this.doc.verrouilleEffectivement(calque.id);
+    if (modifiable && calquePorte(calque, 'trace')) {
       this.conteneur.appendChild(this._conversionRegion(calque));
     }
-    if (calque.type === 'region' && (calque.donnees?.elements.length ?? 0) > 0
-      && !this.doc.verrouilleEffectivement(calque.id)) {
+    if (modifiable && calquePorte(calque, 'region')) {
       this.conteneur.appendChild(this._lissageRegion(calque));
     }
 
@@ -239,22 +251,23 @@ export class Inspecteur {
 
     const titre = document.createElement('span');
     titre.className = 'group-title';
-    titre.textContent = calque.type === 'groupe' ? 'Entité' : 'Fiche';
+    titre.textContent = calque.enfants ? 'Entité' : 'Fiche';
     bloc.appendChild(titre);
 
     if (!ficheRenseignee(calque.fiche)) {
-      const note = document.createElement('p');
-      note.className = 'reglages-note';
-      note.textContent = calque.type === 'groupe'
-        ? 'Décrivez ici ce que ce groupe désigne : la peinture, les épingles et les '
-          + 'mesures qu’il contient en deviennent les facettes.'
-        : 'Une description, une nature d’énoncé, des valeurs — attachées à ce calque.';
-      bloc.appendChild(note);
-
+      // The paragraph that used to stand here said what a card is. The button
+      // says it too, in three words, and it is the thing you came here to
+      // press — so the sentence moved into its tooltip and stopped occupying
+      // the panel for a reader who already knows.
       const ouvrir = document.createElement('button');
       ouvrir.type = 'button';
       ouvrir.className = 'inspecteur-action';
-      ouvrir.textContent = calque.type === 'groupe' ? 'Décrire cette entité' : 'Décrire ce calque';
+      ouvrir.textContent = calque.enfants ? 'Décrire cette entité' : 'Décrire ce calque';
+      ouvrir.title = calque.enfants
+        ? 'Décrivez ce que ce groupe désigne : la peinture, les annotations et les '
+          + 'mesures qu’il contient en deviennent les facettes.'
+        : 'Une description, une nature d’énoncé, des valeurs — attachées à ce calque, '
+          + 'et son nom devient son étiquette dans la vue.';
       ouvrir.addEventListener('click', () => this.surOuvrirFiche?.(calque.id));
       bloc.appendChild(ouvrir);
       return bloc;

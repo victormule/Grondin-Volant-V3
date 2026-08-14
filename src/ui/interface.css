@@ -18,6 +18,10 @@
   --muted-fort: #485251;
   --border: rgba(27, 42, 40, 0.12);
   --border-fort: rgba(27, 42, 40, 0.2);
+  /* Le liseré des plaques de couleur. Il existe pour que le calque blanc ne
+     disparaisse pas dans un panneau clair — donc il s'inverse avec le thème,
+     sans quoi c'est le calque noir qui disparaît dans un panneau sombre. */
+  --liseree-plaque: rgba(0, 0, 0, 0.16);
   --button: #176b65;
   --button-hover: #115c57;
   --button-text: #fff;
@@ -46,6 +50,7 @@
     --muted-fort: #c1cbc8;
     --border: rgba(236, 246, 242, 0.12);
     --border-fort: rgba(236, 246, 242, 0.2);
+    --liseree-plaque: rgba(255, 255, 255, 0.26);
     --button: #45b7aa;
     --button-hover: #59c7ba;
     --button-text: #082b28;
@@ -147,6 +152,9 @@ button:disabled {
   -webkit-backdrop-filter: blur(22px) saturate(1.15);
   scrollbar-color: var(--border-fort) transparent;
   scrollbar-width: thin;
+  /* La gouttière est réservée en permanence : sans elle le contenu saute de
+     quelques pixels dès que le panneau devient assez long pour défiler. */
+  scrollbar-gutter: stable;
   transition: transform 280ms cubic-bezier(0.22, 0.72, 0.2, 1),
     opacity 200ms ease;
 }
@@ -168,6 +176,18 @@ button:disabled {
   background: var(--border-fort);
 }
 
+/* Une boîte arrondie qui défile pose sa barre à ras du bord : le haut et le
+   bas du rail se font rogner par l'arrondi, ce qui se voit comme une barre qui
+   dépasse du cadre. On rentre le rail de la hauteur de l'arrondi. */
+.panel::-webkit-scrollbar-track,
+.calques-liste::-webkit-scrollbar-track,
+.inspecteur::-webkit-scrollbar-track,
+.fiche::-webkit-scrollbar-track,
+.reglages-outil::-webkit-scrollbar-track {
+  margin: 0.7rem 0;
+  background: transparent;
+}
+
 .panel.collapsed {
   opacity: 0;
   pointer-events: none;
@@ -180,6 +200,11 @@ button:disabled {
   padding: 0.9rem;
   gap: 0.65rem;
   border: 1px solid var(--border);
+  /* Ce panneau ne défile pas lui-même : la liste et l'inspecteur ont chacun
+     leur propre défilement. Il héritait pourtant du `overflow-y: auto` de
+     `.panel`, et sa barre venait se coller au bord arrondi — d'où l'impression
+     qu'elle dépassait du panneau. */
+  overflow: hidden;
 }
 
 /* Toggle buttons stay just outside a panel's working surface. */
@@ -284,8 +309,39 @@ button:disabled {
   text-transform: uppercase;
 }
 
+/* Devenu un bouton, mais il ne doit pas en avoir l'air au repos : c'est le
+   titre du document, pas une commande. L'affordance vient au survol. */
 .title-group {
   min-width: 0;
+  display: block;
+  padding: 0.3rem 0.4rem;
+  margin: -0.3rem -0.4rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.title-group:hover,
+.title-group:focus-visible {
+  background: var(--surbrillance);
+}
+
+/* Un dossier sans en-tête est normal tant qu'on travaille, et un problème dès
+   qu'on transmet. D'où un rappel, discret, plutôt qu'une alerte. */
+.projet-appel {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0.08rem 0.36rem;
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, #c48a30 16%, transparent);
+  color: var(--muted-fort);
+  font-size: 0.64rem;
+  font-weight: 600;
 }
 
 .title-group h1 {
@@ -547,11 +603,16 @@ input[type="range"]::-moz-range-thumb {
   font-size: 0.7rem;
 }
 
-.menu-ancre {
-  flex: 1.35 1 0;
+.barre-actions .bouton-action {
+  min-height: 2rem;
+  border-radius: 0.6rem;
 }
 
-.action-principale,
+.barre-actions .bouton-action:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  background: var(--accent-doux);
+}
+
 #exporterAnnotations {
   border-color: transparent;
   background: var(--button);
@@ -559,7 +620,6 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 0.25rem 0.8rem color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
-.action-principale:hover,
 #exporterAnnotations:hover {
   border-color: transparent;
   background: var(--button-hover);
@@ -574,44 +634,12 @@ input[type="range"]::-moz-range-thumb {
   background: var(--danger-doux);
 }
 
-.menu {
-  top: calc(100% + 0.45rem);
-  min-width: 11.5rem;
-  padding: 0.35rem;
-  border-radius: 0.82rem;
-  background: var(--panel-fort);
-  box-shadow: var(--ombre-flottante);
-  backdrop-filter: blur(22px);
-}
-
-.menu-option {
-  min-height: 2.1rem;
-  padding: 0.5rem 0.6rem !important;
-  border-radius: 0.55rem !important;
-  background: transparent;
-  box-shadow: none;
-}
-
-.menu-option:hover {
-  background: var(--accent-doux);
-  color: var(--text);
-}
-
-.menu-icone {
-  display: grid;
-  width: 1.35rem;
-  height: 1.35rem;
-  place-items: center;
-  border-radius: 0.4rem;
-  background: var(--surbrillance);
-  color: var(--accent);
-}
-
+/* Plus d'encadré : le cadre ambré donnait à un état permanent l'allure d'une
+   alerte, et il coûtait deux fois sa hauteur de texte. La pastille suffit. */
 .bandeau-brouillon {
-  padding: 0.48rem 0.6rem;
-  border-color: color-mix(in srgb, #c48a30 28%, var(--border));
-  border-radius: 0.65rem;
-  background: color-mix(in srgb, #c48a30 9%, var(--panel-doux));
+  padding: 0.06rem 0.1rem 0.06rem 0.05rem;
+  border: 0;
+  background: transparent;
   color: var(--muted-fort);
 }
 
@@ -633,6 +661,16 @@ input[type="range"]::-moz-range-thumb {
   text-align: center;
 }
 
+.inspecteur-multiple {
+  margin: 0;
+  padding: 0.4rem 0.5rem;
+  border-radius: 0.55rem;
+  background: var(--accent-doux);
+  color: var(--muted-fort);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
 .calque {
   gap: 0.38rem;
   min-height: 2.15rem;
@@ -649,10 +687,18 @@ input[type="range"]::-moz-range-thumb {
   background: var(--surbrillance);
 }
 
+/* Plusieurs lignes peuvent être allumées à la fois ; une seule est celle dont
+   l'inspecteur montre les propriétés. Les deux états se distinguent, sinon une
+   sélection multiple ressemble à une sélection simple qui s'est perdue. */
 .calque.selectionne {
+  border-color: color-mix(in srgb, var(--accent) 16%, transparent);
+  background: color-mix(in srgb, var(--accent-doux) 62%, transparent);
+  color: var(--text);
+}
+
+.calque.selectionne.principal {
   border-color: color-mix(in srgb, var(--accent) 22%, transparent);
   background: linear-gradient(105deg, var(--accent-moyen), var(--accent-doux));
-  color: var(--text);
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
@@ -662,25 +708,21 @@ input[type="range"]::-moz-range-thumb {
   opacity: 1;
 }
 
-.calque.contient-selection {
-  border-color: color-mix(in srgb, var(--accent) 12%, transparent);
-  background: color-mix(in srgb, var(--accent-doux) 58%, transparent);
-}
-
 .calque-chevron,
-.calque-oeil {
+.calque-oeil,
+.calque-etiquette-bascule {
   border: 0;
   box-shadow: none;
 }
 
+/* La bordure blanche mangeait un pixel sur quatorze : à cette taille la
+   silhouette a besoin de toute la plaque. Le liseré passe à l'intérieur. */
 .calque-pastille {
-  width: 1.3rem;
-  height: 1.3rem;
-  border: 1px solid rgba(255, 255, 255, 0.48);
+  width: 1.32rem;
+  height: 1.32rem;
+  border: 0;
   border-radius: 0.42rem;
-  box-shadow: 0 0.1rem 0.3rem rgba(0, 0, 0, 0.12);
-  font-size: 0.62rem;
-  font-weight: 700;
+  box-shadow: inset 0 0 0 1px var(--liseree-plaque), 0 0.1rem 0.3rem rgba(0, 0, 0, 0.1);
 }
 
 .calque-nom {
@@ -701,72 +743,6 @@ input[type="range"]::-moz-range-thumb {
   font-size: 0.59rem;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-}
-
-.calque-element {
-  display: grid;
-  grid-template-columns: 0.52rem minmax(0, 1fr);
-  gap: 0.5rem;
-  align-items: center;
-  min-height: 2.25rem;
-  margin: 0.08rem 0;
-  padding: 0.34rem 0.48rem;
-  padding-left: calc(0.75rem + var(--profondeur, 1) * 0.85rem);
-  border: 1px solid transparent;
-  border-radius: 0.58rem;
-  color: var(--muted-fort);
-  cursor: pointer;
-  transition: color var(--transition-ui), background var(--transition-ui),
-    border-color var(--transition-ui);
-}
-
-.calque-element:hover {
-  border-color: color-mix(in srgb, var(--border) 75%, transparent);
-  background: var(--surbrillance);
-}
-
-.calque-element.selectionne {
-  border-color: color-mix(in srgb, var(--accent) 24%, transparent);
-  background: var(--accent-doux);
-  color: var(--text);
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-
-.calque-element.masque,
-.calque-element.hors-portee {
-  opacity: 0.46;
-}
-
-.calque-element-point {
-  width: 0.45rem;
-  height: 0.45rem;
-  border: 1px solid color-mix(in srgb, var(--panel-fort) 72%, transparent);
-  border-radius: 50%;
-  box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 16%, transparent);
-}
-
-.calque-element-textes {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 0.06rem;
-}
-
-.calque-element-titre,
-.calque-element-description {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.calque-element-titre {
-  font-size: 0.7rem;
-  font-weight: 590;
-}
-
-.calque-element-description {
-  color: var(--muted);
-  font-size: 0.61rem;
 }
 
 .calque-nom-champ {
@@ -883,6 +859,10 @@ input[type="range"]::-moz-range-thumb {
   height: var(--hauteur-inspecteur, 16.25rem);
   min-height: 6rem;
   max-height: 68%;
+  /* Filet de sécurité pour le calcul de `_hauteurInspecteurMax` : même à
+     quelques pixels près, l'inspecteur cède avant que le pied ne sorte. La
+     liste cède trois fois plus vite — c'est elle qui a de la place à donner. */
+  flex: 0 1 auto;
   padding: 0.78rem;
   border: 1px solid var(--border);
   border-radius: 0.82rem;
@@ -965,22 +945,28 @@ select.champ {
   padding: 0.12rem 0;
 }
 
+/* Côte à côte. Empilés, deux boutons pleine largeur mangeaient cent pixels au
+   bas du panneau pour deux gestes qu'on fait une fois par séance. */
 .panneau-pied {
   display: flex;
-  flex-direction: column;
-  gap: 0.32rem;
+  flex-direction: row;
+  gap: 0.4rem;
   padding-top: 0.05rem;
 }
 
 .panneau-pied button {
-  min-height: 2.2rem;
+  min-height: 2.05rem;
+  white-space: nowrap;
 }
 
 /* L'import est la porte d'entrée, l'export la porte de sortie : même poids
-   visuel serait trompeur, puisque l'import écrase le travail en cours. */
+   visuel serait trompeur, puisque l'import écrase le travail en cours. C'est
+   la largeur qui porte cette différence maintenant, pas la hauteur. */
+#exporterAnnotations { flex: 1.45 1 0; }
+
 #importerAnnotations {
+  flex: 1 1 0;
   font-size: 0.72rem;
-  min-height: 1.9rem;
 }
 
 /* --------------------------------------------------------- outils flottants */
@@ -1070,10 +1056,20 @@ body:has(.panneau-calques.collapsed) .barre-outils {
   white-space: pre;
 }
 
-.outil:first-child:hover::after,
-.outil:first-child:focus-visible::after {
+/* Tous les outils, pas seulement le premier. La règle ne visait que
+   `:first-child` — le seul outil sans panneau de réglages — donc survoler le
+   pinceau ou la mesure n'annonçait rien tant que le panneau n'était pas ouvert.
+   Un outil dont le panneau est ouvert se tait : le panneau porte déjà son nom,
+   et l'infobulle viendrait se poser dessus. */
+.outil:hover::after,
+.outil:focus-visible::after {
   opacity: 1;
   transform: translate(0, -50%);
+}
+
+.outil[data-panneau-ouvert]::after {
+  opacity: 0;
+  transform: translate(0.25rem, -50%);
 }
 
 .reglages-outil {
@@ -1088,7 +1084,11 @@ body:has(.panneau-calques.collapsed) .barre-outils {
   -webkit-backdrop-filter: blur(22px) saturate(1.12);
 }
 
-.reglages-outil > .group-title:first-child {
+/* Le titre est descendu d'un cran quand il s'est rangé dans `.reglages-entete`
+   à côté du « ? » : `> .group-title:first-child` ne l'atteignait plus, et les
+   panneaux avaient perdu la graisse de leur nom sans que rien ne le signale. */
+.reglages-outil > .group-title:first-child,
+.reglages-outil > .reglages-entete > .group-title {
   color: var(--text);
   font-size: 0.78rem;
   font-weight: 680;
@@ -1116,6 +1116,34 @@ body:has(.panneau-calques.collapsed) .barre-outils {
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-doux);
+}
+
+/* Trois états, trois allures. Un calque qui existe : plaque pleine, pastille
+   pleine. Un calque qui n'existe pas encore et naîtra du geste suivant :
+   pointillés et pastille creuse — rien n'est encore posé, et ça se voit sans
+   lire. Rien à viser du tout : éteint. */
+.reglages-cible[data-etat="nouveau"] {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.reglages-cible[data-etat="nouveau"]::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+.reglages-cible[data-etat="vide"] {
+  border-style: dashed;
+  border-color: var(--border);
+  background: transparent;
+  color: var(--muted);
+}
+
+.reglages-cible[data-etat="vide"]::before {
+  background: var(--muted);
+  opacity: 0.45;
+  box-shadow: none;
 }
 
 .reglages-note {
@@ -1181,57 +1209,63 @@ body:has(.panneau-calques.collapsed) .barre-outils {
   color: var(--button-text);
 }
 
-/* ------------------------------------------------------ fiche annotation */
+/* ---------------------------------------------------------------- fiche */
 
-.panneau-calques.fiche-ouverte > .panneau-entete,
-.panneau-calques.fiche-ouverte > .calques-liste,
-.panneau-calques.fiche-ouverte > .fiche {
-  display: flex;
-}
-
-.panneau-calques.fiche-ouverte > .barre-calques,
-.panneau-calques.fiche-ouverte > .bandeau-brouillon,
-.panneau-calques.fiche-ouverte > .barre-inspecteur,
-.panneau-calques.fiche-ouverte > .inspecteur,
-.panneau-calques.fiche-ouverte > .panneau-pied {
-  display: none !important;
-}
-
-.panneau-calques.fiche-ouverte > .calques-liste {
-  flex: 0 1 38%;
-  min-height: 7.5rem;
-  max-height: 38%;
-  flex-direction: column;
-}
-
-.fiche {
-  position: relative;
-  inset: auto;
-  flex: 1 1 62%;
-  min-height: 0;
-  gap: 0.78rem;
-  padding: 0.85rem 0.15rem 0.15rem;
-  border-top: 1px solid var(--border);
-  border-radius: 0;
-  background: transparent;
+.fiche-flottante {
+  border-color: color-mix(in srgb, var(--accent) 16%, var(--border));
+  background: var(--panel-fort);
+  box-shadow: var(--ombre-flottante);
+  -webkit-backdrop-filter: blur(22px) saturate(1.1);
+  backdrop-filter: blur(22px) saturate(1.1);
 }
 
 .fiche-entete {
-  min-height: 2.25rem;
-  padding-bottom: 0.45rem;
+  min-height: 2.05rem;
   border-bottom: 1px solid var(--border);
 }
 
-.fiche-retour {
+.fiche-pastille {
+  box-shadow: inset 0 0 0 1px var(--liseree-plaque), 0 0.1rem 0.3rem rgba(0, 0, 0, 0.12);
+}
+
+.fiche-fermer {
   border-color: transparent;
   background: transparent;
-  color: var(--accent);
+  color: var(--muted-fort);
   box-shadow: none;
 }
 
+.fiche-fermer:hover {
+  border-color: color-mix(in srgb, var(--danger) 25%, var(--border));
+  background: var(--danger-doux);
+  color: var(--danger);
+}
+
 .fiche-titre {
-  min-height: 2.45rem;
-  font-size: 0.9rem;
+  min-height: 2rem;
+  font-size: 0.82rem;
+}
+
+.fiche-section {
+  background: color-mix(in srgb, var(--panel-doux) 55%, transparent);
+}
+
+.fiche-section > summary:hover {
+  background: var(--surbrillance);
+  border-radius: 0.55rem;
+}
+
+/* Le texte est ce qu'on vient écrire : c'est la seule chose à qui la fiche
+   donne de la place d'office. */
+.fiche-texte {
+  display: flex;
+  min-height: 4rem;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.fiche-texte > * {
+  flex: 1 1 auto;
 }
 
 .fiche-rendu {
@@ -1361,10 +1395,6 @@ body:has(.panneau-calques.collapsed) .barre-outils {
     min-height: 2.75rem;
   }
 
-  .calque-element {
-    min-height: 2.75rem;
-  }
-
   .barre-inspecteur {
     min-height: 2.75rem;
   }
@@ -1378,6 +1408,27 @@ body:has(.panneau-calques.collapsed) .barre-outils {
   .barre-calques button,
   .panneau-pied button {
     min-height: 2.65rem;
+  }
+
+  /* Une cible tactile carrée : la rangée d'actions ne s'étire pas comme des
+     boutons libellés le feraient. */
+  .barre-actions .bouton-action {
+    width: 2.65rem;
+    height: 2.65rem;
+  }
+
+  .calque-etiquette-bascule,
+  .calque-oeil {
+    width: 1.6rem;
+    height: 1.6rem;
+  }
+
+  /* Le panneau est plein écran sur mobile : la fiche flottante prend toute la
+     largeur restante plutôt qu'une colonne centrée qui n'existe plus. */
+  .fiche-flottante {
+    width: calc(100vw - 1.2rem);
+    max-height: 60vh;
+    bottom: 0.6rem;
   }
 
   input[type="range"] {

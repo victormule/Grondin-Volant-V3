@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { calquePorte } from '../document/modele.js';
 
 export class CoucheContours {
   constructor(scene, renderer, config) {
@@ -103,7 +104,7 @@ export class CoucheContours {
     if (!capture) { this._nettoyer(vus); return; }
 
     for (const { calque } of doc.aplatir()) {
-      if (calque.type !== 'region' || calque.contour === false) continue;
+      if (!calquePorte(calque, 'region') || calque.contour === false) continue;
       if (!doc.visibleEffectivement(calque.id)) continue;
       if (!doc.concerneSession(calque, capture.session)) continue;
 

@@ -79,6 +79,10 @@ export function commandeInstantane(document_, nom, mutation) {
     document_.sessionReference = copie.sessionReference;
     document_.racine = copie.racine;
     document_.medias = copie.medias;
+    // The project record rides in `serialiser()`, so it has to ride back out
+    // again — otherwise an undo silently keeps a header the snapshot says was
+    // never written, and the two halves of the document drift apart.
+    document_.projet = copie.projet;
   };
 
   return {

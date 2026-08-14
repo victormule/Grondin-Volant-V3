@@ -1,73 +1,127 @@
 // The layer list: a tree, in reverse document order, the way every layer panel
 // in every image editor shows it — top of the list is top of the stack.
+//
+// One row per layer, and nothing else. Annotations used to appear twice over:
+// once as the layer holding them and once as a nested list underneath it, at a
+// depth that looked like containment but was not the tree. An annotation is a
+// layer now, so it is a row like every other, and the panel has one kind of
+// thing in it again.
 
-import { TYPES_CALQUE, NATURES, CONFIANCES, ficheRenseignee } from '../document/modele.js';
+import {
+  TYPES_CALQUE, NATURES, CONFIANCES, GENRES, ficheRenseignee, typeAffiche, genresDuCalque,
+} from '../document/modele.js';
+import { marquerPastille } from './glyphes.js';
 
 const OEIL_VISIBLE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><circle cx="8" cy="8" r="2"/></svg>';
 const OEIL_MASQUE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8Z"/><path d="M3 13 13 3"/></svg>';
 const CADENAS = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>';
 const POIGNEE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5.5h10M3 8h10M3 10.5h10"/></svg>';
+// A luggage tag: the label the layer puts on the specimen, and the switch that
+// takes it off again.
+const ETIQUETTE_VISIBLE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8.4 2H13a1 1 0 0 1 1 1v4.6a1 1 0 0 1-.3.7l-5.4 5.4a1 1 0 0 1-1.4 0L2.3 9.1a1 1 0 0 1 0-1.4l5.4-5.4a1 1 0 0 1 .7-.3Z"/><circle cx="11" cy="5" r="1"/></svg>';
+const ETIQUETTE_MASQUEE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8.4 2H13a1 1 0 0 1 1 1v4.6a1 1 0 0 1-.3.7l-5.4 5.4a1 1 0 0 1-1.4 0L2.3 9.1a1 1 0 0 1 0-1.4l5.4-5.4a1 1 0 0 1 .7-.3Z"/><path d="M2.5 13.5 13.5 2.5"/></svg>';
 
 // Movement past which a press becomes a drag rather than a tap.
 const SEUIL_GLISSE = 6;
 
 export class ListeCalques {
-  constructor(conteneur, { document: doc, surMutation, surSelection, surSelectionElement }) {
+  constructor(conteneur, { document: doc, surMutation, surSelection }) {
     this.conteneur = conteneur;
     this.doc = doc;
     this.surMutation = surMutation;
     this.surSelection = surSelection;
-    this.surSelectionElement = surSelectionElement;
+    // The layer the inspector and the card speak for. It is always a member of
+    // `selections`, which is what makes « the selection » unambiguous when
+    // several rows are lit.
     this.selection = null;
-    this.selectionElement = null;
+    this.selections = new Set();
     this.sessionActive = null;
     this.glisse = null;
+    this.ordreRendu = [];
   }
 
   definirDocument(doc) {
     this.doc = doc;
-    if (this.selection && !this.doc.trouver(this.selection)) this.selection = null;
-    if (this.selectionElement) {
-      const calque = this.doc.trouver(this.selectionElement.idCalque);
-      const existe = calque?.donnees?.elements.some((e) => e.id === this.selectionElement.idElement);
-      if (!existe) this.selectionElement = null;
+    for (const id of [...this.selections]) {
+      if (!this.doc.trouver(id)) this.selections.delete(id);
+    }
+    if (this.selection && !this.doc.trouver(this.selection)) {
+      this.selection = this.selections.values().next().value ?? null;
     }
     this.rendre();
+  }
+
+  /* ---------------------------------------------------------- sélection */
+
+  get selectionMultiple() {
+    return [...this.selections];
+  }
+
+  // Selected layers in document order, bottom of the stack first. Merging and
+  // deleting both need this order rather than the order rows were clicked in.
+  calquesSelectionnes() {
+    return this.doc.aplatir()
+      .map(({ calque }) => calque)
+      .filter((calque) => this.selections.has(calque.id));
   }
 
   selectionner(id, prevenir = true) {
     this.selection = id;
-    this.selectionElement = null;
+    this.selections = new Set(id ? [id] : []);
     this.rendre();
     if (prevenir) this.surSelection?.(id);
   }
 
-  selectionnerElement(idElement, idCalque, prevenir = true) {
-    const calque = this.doc.trouver(idCalque);
-    if (!calque?.donnees?.elements.some((e) => e.id === idElement)) return false;
-    this.selection = idCalque;
-    this.selectionElement = { idElement, idCalque };
-    calque.replie = false;
-    let parent = this.doc.parentDe(idCalque);
-    while (parent && parent !== this.doc.racine) {
-      parent.replie = false;
-      parent = this.doc.parentDe(parent.id);
+  // Ctrl/Cmd picks layers one by one, Shift takes everything between the anchor
+  // and the row clicked — the two gestures every list in every editor uses, and
+  // the reason the merge and delete buttons can act on a set at all.
+  _selectionnerAvecClavier(id, evenement) {
+    const meta = evenement.ctrlKey || evenement.metaKey;
+    if (evenement.shiftKey && this.selection) {
+      const ordre = this.ordreRendu;
+      const depart = ordre.indexOf(this.selection);
+      const arrivee = ordre.indexOf(id);
+      if (depart >= 0 && arrivee >= 0) {
+        const [a, b] = depart < arrivee ? [depart, arrivee] : [arrivee, depart];
+        if (!meta) this.selections = new Set();
+        for (let i = a; i <= b; i++) this.selections.add(ordre[i]);
+        // The anchor does not move on a Shift click: pressing Shift again has
+        // to be able to shrink the range it just grew.
+        this.selections.add(this.selection);
+        this.rendre();
+        this.surSelection?.(this.selection);
+        return;
+      }
     }
-    this.rendre();
-    this.conteneur.querySelector(`.calque-element[data-element-id="${idElement}"]`)
-      ?.scrollIntoView({ block: 'nearest' });
-    if (prevenir) this.surSelectionElement?.(idElement, idCalque);
-    return true;
+
+    if (meta) {
+      if (this.selections.has(id) && this.selections.size > 1) {
+        this.selections.delete(id);
+        if (this.selection === id) this.selection = this.selections.values().next().value;
+      } else {
+        this.selections.add(id);
+        this.selection = id;
+      }
+      this.rendre();
+      this.surSelection?.(this.selection);
+      return;
+    }
+
+    this.selectionner(id);
   }
+
+  /* -------------------------------------------------------------- rendu */
 
   rendre() {
     const lignes = this.doc.pourAffichage();
     this.conteneur.replaceChildren();
+    this.ordreRendu = [];
 
     if (lignes.length === 0) {
       const vide = document.createElement('p');
       vide.className = 'calques-vide';
-      vide.textContent = 'Aucun calque. Créez-en un pour commencer.';
+      vide.textContent = 'Aucun calque. Un outil en crée un au premier geste, '
+        + 'et le bouton ci-dessus crée un groupe.';
       this.conteneur.appendChild(vide);
       return;
     }
@@ -78,37 +132,40 @@ export class ListeCalques {
       const parent = this.doc.parentDe(calque.id);
       if (parent && masques.has(parent.id)) { masques.add(calque.id); continue; }
       if (calque.enfants && calque.replie) masques.add(calque.id);
+      this.ordreRendu.push(calque.id);
       this.conteneur.appendChild(this._ligne(calque, profondeur));
-      if (calque.type === 'annotation' && !calque.replie) {
-        const elements = calque.donnees?.elements ?? [];
-        elements.forEach((element, index) => {
-          this.conteneur.appendChild(this._element(calque, element, profondeur + 1, index));
-        });
-      }
     }
   }
 
   _ligne(calque, profondeur) {
-    const modele = TYPES_CALQUE[calque.type] || TYPES_CALQUE.annotation;
+    const modele = typeAffiche(calque);
     const ligne = document.createElement('div');
     ligne.className = 'calque';
     ligne.dataset.id = calque.id;
     ligne.style.setProperty('--profondeur', profondeur);
     ligne.tabIndex = 0;
-    if (calque.id === this.selection) {
-      ligne.classList.add(this.selectionElement ? 'contient-selection' : 'selectionne');
+
+    // One rule per level of nesting, dropped under the parent's chevron. Depth
+    // was carried by indentation alone — thirteen pixels a level, which is not
+    // enough to read a tree at a glance, and annotations are layers now so the
+    // tree gets deep quickly.
+    if (profondeur > 0) {
+      const guides = document.createElement('span');
+      guides.className = 'calque-guides';
+      guides.setAttribute('aria-hidden', 'true');
+      for (let i = 0; i < profondeur; i++) guides.appendChild(document.createElement('span'));
+      ligne.appendChild(guides);
+    }
+    if (this.selections.has(calque.id)) {
+      ligne.classList.add('selectionne');
+      if (calque.id === this.selection) ligne.classList.add('principal');
     }
     if (!this.doc.visibleEffectivement(calque.id)) ligne.classList.add('masque');
     const verrouilleEffectif = this.doc.verrouilleEffectivement(calque.id);
     if (verrouilleEffectif) ligne.classList.add('verrouille');
     if (!this.doc.concerneSession(calque, this.sessionActive)) ligne.classList.add('hors-portee');
 
-    const nombreElements = calque.type === 'annotation'
-      ? (calque.donnees?.elements.length ?? 0)
-      : 0;
-    const depliable = Boolean(calque.enfants) || nombreElements > 0;
-
-    if (depliable) {
+    if (calque.enfants) {
       const chevron = document.createElement('button');
       chevron.type = 'button';
       chevron.className = 'calque-chevron';
@@ -139,9 +196,8 @@ export class ListeCalques {
 
     const pastille = document.createElement('span');
     pastille.className = 'calque-pastille';
-    pastille.style.background = calque.couleur;
-    pastille.textContent = modele.icone;
-    pastille.title = modele.libelle;
+    marquerPastille(pastille, calque);
+    pastille.title = this._descriptionContenu(calque, modele);
     ligne.appendChild(pastille);
 
     const nom = document.createElement('span');
@@ -169,13 +225,17 @@ export class ListeCalques {
       ligne.appendChild(marque);
     }
 
-    if (nombreElements > 0) {
+    const nombreElements = calque.donnees?.elements.length ?? 0;
+    if (nombreElements > 1) {
       const compte = document.createElement('span');
       compte.className = 'calque-compte';
       compte.textContent = String(nombreElements);
-      compte.title = `${nombreElements} annotation${nombreElements > 1 ? 's' : ''}`;
+      const libelle = GENRES[genresDuCalque(calque)[0]]?.libelle.toLowerCase() ?? 'éléments';
+      compte.title = `${nombreElements} tracés de ${libelle} dans ce calque`;
       ligne.appendChild(compte);
     }
+
+    ligne.appendChild(this._basculeEtiquette(calque));
 
     if (verrouilleEffectif) {
       const verrou = document.createElement('span');
@@ -195,61 +255,37 @@ export class ListeCalques {
     poignee.addEventListener('pointerdown', (e) => this._debut(e, calque.id, ligne, true));
     ligne.appendChild(poignee);
 
-    ligne.addEventListener('click', () => this.selectionner(calque.id));
+    ligne.addEventListener('click', (e) => this._selectionnerAvecClavier(calque.id, e));
     ligne.addEventListener('pointerdown', (e) => this._debut(e, calque.id, ligne, false));
 
     return ligne;
   }
 
-  _element(calque, element, profondeur, index) {
-    const ligne = document.createElement('div');
-    ligne.className = 'calque-element';
-    ligne.dataset.elementId = element.id;
-    ligne.dataset.calqueId = calque.id;
-    ligne.style.setProperty('--profondeur', profondeur);
-    ligne.tabIndex = 0;
-    ligne.setAttribute('role', 'button');
-
-    if (this.selectionElement?.idElement === element.id) ligne.classList.add('selectionne');
-    if (!this.doc.visibleEffectivement(calque.id)) ligne.classList.add('masque');
-    if (!this.doc.concerneSession(calque, this.sessionActive)) ligne.classList.add('hors-portee');
-
-    const point = document.createElement('span');
-    point.className = 'calque-element-point';
-    point.style.background = calque.couleur;
-
-    const textes = document.createElement('span');
-    textes.className = 'calque-element-textes';
-    const titre = document.createElement('span');
-    titre.className = 'calque-element-titre';
-    titre.textContent = element.titre?.trim() || `Annotation ${index + 1}`;
-    textes.appendChild(titre);
-
-    const resume = String(element.texte ?? '')
-      .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
-      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-      .replace(/[`#>*_~|-]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (resume) {
-      const description = document.createElement('span');
-      description.className = 'calque-element-description';
-      description.textContent = resume;
-      textes.appendChild(description);
-    }
-
-    ligne.append(point, textes);
-    const choisir = (evenement) => {
-      evenement.stopPropagation();
-      this.selectionnerElement(element.id, calque.id);
-    };
-    ligne.addEventListener('click', choisir);
-    ligne.addEventListener('keydown', (evenement) => {
-      if (evenement.key !== 'Enter' && evenement.key !== ' ') return;
-      evenement.preventDefault();
-      choisir(evenement);
+  // The switch that silences a layer in the view. Every kind of layer carries a
+  // label now, so every kind needs to be able to shut up: a document with forty
+  // measured zones is unreadable if all forty insist on their name.
+  _basculeEtiquette(calque) {
+    const actif = calque.etiquette !== false;
+    const bouton = document.createElement('button');
+    bouton.type = 'button';
+    bouton.className = 'calque-etiquette-bascule';
+    bouton.innerHTML = actif ? ETIQUETTE_VISIBLE : ETIQUETTE_MASQUEE;
+    bouton.setAttribute('aria-pressed', String(actif));
+    bouton.classList.toggle('inactive', !actif);
+    bouton.title = calque.enfants
+      ? (actif ? 'Étiquettes du groupe affichées' : 'Étiquettes du groupe masquées')
+      : (actif ? 'Masquer l’étiquette dans la vue' : 'Afficher l’étiquette dans la vue');
+    bouton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.surMutation(actif ? 'Masquer l’étiquette' : 'Afficher l’étiquette',
+        () => { calque.etiquette = !actif; });
     });
-    return ligne;
+    return bouton;
+  }
+
+  _descriptionContenu(calque, modele) {
+    if (calque.enfants) return TYPES_CALQUE.groupe.libelle;
+    return GENRES[genresDuCalque(calque)[0]]?.libelle ?? modele.libelle;
   }
 
   renommer(id) {
@@ -304,7 +340,7 @@ export class ListeCalques {
   // the pointer to travel a few pixels, so an ordinary click still selects.
   _debut(evenement, id, ligne, depuisPoignee) {
     if (evenement.button !== undefined && evenement.button !== 0) return;
-    // Eyes, chevrons and the rename field have their own jobs.
+    // Eyes, chevrons, switches and the rename field have their own jobs.
     if (!depuisPoignee && evenement.target.closest('button, input')) return;
     if (depuisPoignee) evenement.stopPropagation();
 
@@ -319,8 +355,14 @@ export class ListeCalques {
         arme = true;
       }
       if (!this.glisse) {
-        this.glisse = id;
-        ligne.classList.add('en-deplacement');
+        // Dragging a row that is part of a multiple selection moves the whole
+        // selection; dragging any other row means that row alone, and drops the
+        // selection rather than silently carrying it along.
+        this.glisse = this.selections.has(id) ? this.calquesSelectionnes().map((c) => c.id) : [id];
+        for (const idGlisse of this.glisse) {
+          this.conteneur.querySelector(`.calque[data-id="${idGlisse}"]`)
+            ?.classList.add('en-deplacement');
+        }
         ligne.setPointerCapture?.(pointeur);
       }
       e.preventDefault();
@@ -363,43 +405,52 @@ export class ListeCalques {
     return ligne && this.conteneur.contains(ligne) ? ligne : null;
   }
 
+  _refuse(idCible) {
+    return this.glisse.some((id) => id === idCible || this.doc.contient(id, idCible));
+  }
+
   _survol(x, y) {
     this._effacerIndicateur();
     if (!this.glisse) return;
     const ligne = this._ligneSous(x, y);
     if (!ligne) return;
-    if (ligne.dataset.id === this.glisse) return;
-    if (this.doc.contient(this.glisse, ligne.dataset.id)) return;
+    if (this._refuse(ligne.dataset.id)) return;
 
     ligne.classList.add(`depot-${this._zone(ligne, y)}`);
   }
 
   _deposer(x, y) {
     const ligne = this._ligneSous(x, y);
-    const id = this.glisse;
+    // Bottom of the document order first, so that moving several layers into
+    // one place keeps them in the order they were stacked in.
+    const ids = this.glisse;
 
     if (!ligne) {
       // Dropped on empty space: to the top of the stack, at the root.
-      this.surMutation('Déplacer le calque',
-        () => this.doc.deplacer(id, null, this.doc.racine.enfants.length));
+      this.surMutation(ids.length > 1 ? 'Déplacer les calques' : 'Déplacer le calque', () => {
+        for (const id of ids) this.doc.deplacer(id, null, this.doc.racine.enfants.length);
+      });
       return;
     }
 
     const cible = this.doc.trouver(ligne.dataset.id);
-    if (!cible || cible.id === id || this.doc.contient(id, cible.id)) return;
+    if (!cible || this._refuse(cible.id)) return;
 
     const zone = this._zone(ligne, y);
-    this.surMutation('Déplacer le calque', () => {
-      if (zone === 'dedans') {
-        this.doc.deplacer(id, cible.id, cible.enfants.length);
-        return;
+    this.surMutation(ids.length > 1 ? 'Déplacer les calques' : 'Déplacer le calque', () => {
+      for (const id of ids) {
+        if (zone === 'dedans') {
+          this.doc.deplacer(id, cible.id, cible.enfants.length);
+          continue;
+        }
+        const parent = this.doc.parentDe(cible.id);
+        if (!parent) continue;
+        const index = parent.enfants.findIndex((c) => c.id === cible.id);
+        // The list is reversed on screen: dropping "above" a row means later in
+        // document order.
+        this.doc.deplacer(id, parent === this.doc.racine ? null : parent.id,
+          zone === 'avant' ? index + 1 : index);
       }
-      const parent = this.doc.parentDe(cible.id);
-      const index = parent.enfants.findIndex((c) => c.id === cible.id);
-      // The list is reversed on screen: dropping "above" a row means later in
-      // document order.
-      this.doc.deplacer(id, parent === this.doc.racine ? null : parent.id,
-        zone === 'avant' ? index + 1 : index);
     });
   }
 

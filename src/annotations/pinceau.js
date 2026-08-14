@@ -44,6 +44,9 @@ export class Pinceau {
 
     this.trait = {
       id: crypto.randomUUID ? crypto.randomUUID() : 't-' + Math.random().toString(36).slice(2, 11),
+      // What this is, carried by the element itself: a layer can hold strokes
+      // alongside regions, pins and measurements once it has been merged.
+      genre: 'trace',
       empreintes: [],
       durete: this.durete,
       seuilNormale: this.seuilNormale,
