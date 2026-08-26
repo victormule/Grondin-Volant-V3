@@ -1,0 +1,44 @@
+{
+  "nom": "Cadre 3",
+  "repere": "cadre-3/oc-2026-08",
+  "recalage": "sessions/_recalage.json",
+  "sessions": [
+    {
+      "id": "0EB4D665-605A-47C8-BE66-5A8A6D97E6C7",
+      "label": "Capture 1",
+      "date": "26 août 2026",
+      "time": "11:06 – 11:11",
+      "glb": "sessions/0EB4D665-605A-47C8-BE66-5A8A6D97E6C7/model.glb"
+    }
+  ],
+  "reglages": {
+    "camera": {
+      "distanceMin": 0.45,
+      "distanceMax": 22
+    },
+    "peinture": {
+      "taille": 80,
+      "tailleGomme": 80
+    },
+    "affichage": {
+      "vueInitiale": {
+        "azimut": 0,
+        "elevation": 20,
+        "marge": 1
+      },
+      "aplomb": null,
+      "axeRotation": {
+        "point": [
+          0,
+          -9.313226e-10,
+          0
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ]
+      }
+    }
+  }
+}

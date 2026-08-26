@@ -1,0 +1,19 @@
+{
+  "reference": "C6736D68-4A9E-4243-85A3-47966CE779A6",
+  "note": "Résidu du recalage de chaque capture sur la capture de référence. Le RMSE est mesuré sur le recouvrement géométrique : les points dont le plus proche voisin dépasse trois espacements de maillage regardent une surface que l’autre capture n’a pas vue et n’ont rien à dire sur l’alignement. « recouvrement » est la part de points retenus. Unités du modèle.",
+  "espacementMaillage": 0.009886458806229863,
+  "98417501-5E79-4190-B2FA-204027349C01": {
+    "rmse": 0.0074859178427925405,
+    "recouvrement": 0.9959302325581395,
+    "mediane": 0.005931823590703869,
+    "p90": 0.011184028324703662,
+    "voie": "mesuré sur les .glb servis"
+  },
+  "2E2A96D7-F487-42B2-8BC0-C90523136F94": {
+    "rmse": 0.007332411812535111,
+    "recouvrement": 0.9960330578512396,
+    "mediane": 0.005960903886159794,
+    "p90": 0.010847253412525824,
+    "voie": "mesuré sur les .glb servis"
+  }
+}

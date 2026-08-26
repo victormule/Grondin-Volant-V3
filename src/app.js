@@ -6,12 +6,13 @@ import { Scene3D } from './viewer/scene3d.js';
 import { Eclairage } from './viewer/eclairage.js';
 import { OmbreContact } from './viewer/ombre.js';
 import { chargerModele, appliquerMatiere } from './viewer/modeles.js';
-import { configurerAR } from './viewer/ar.js';
 import { installerPanneau, exclusiviteMobile } from './ui/panneaux.js';
+import { installerListeObjets } from './ui/liste-objets.js';
 import {
   DocumentAnnotation, creerCalque, creerEpingle, calquePorte, genreElement, identifiant,
-  ficheRenseignee, projetRenseigne, REPERE, VERSION,
+  ficheRenseignee, projetRenseigne, VERSION,
 } from './document/modele.js';
+import { objet, catalogue } from './objet.js';
 import { FicheProjet } from './ui/projet.js';
 import { PileCommandes } from './document/commandes.js';
 import { chargerBrouillon, chargerPublie, supprimerBrouillon, SauvegardeDifferee } from './document/stockage.js';
@@ -70,7 +71,6 @@ const elements = {
   lumiereForceValeur: $('#lightKeyValue'),
   lumiereAmbiance: $('#lightFillRange'),
   lumiereAmbianceValeur: $('#lightFillValue'),
-  ar: $('#arButton'),
 };
 
 const elementsCalques = {
@@ -106,7 +106,6 @@ eclairage.surChangement = () => scene3d.demanderRendu();
 // rebuilt environment map.
 scene3d.avantRendu = () => eclairage.orienter();
 ombre.surChangement = () => scene3d.demanderRendu();
-const definirSourcesAR = configurerAR(elements.ar, document.title);
 
 const anisotropie = scene3d.renderer.capabilities.getMaxAnisotropy();
 const modelesCharges = [];
@@ -269,8 +268,11 @@ appliquerMatiereGlobale();
 
 /* ----------------------------------------------------------- annotations */
 
-// Keyed by path so two deployments on the same domain keep separate drafts.
-const ID_PROJET = `durair:${location.pathname}`;
+// Keyed by path AND by object: two deployments on the same domain keep
+// separate drafts, and so do two objects of the same deployment — a draft on
+// the cadre must never be handed to the fish, whose coordinates it would land
+// nowhere near.
+const ID_PROJET = `durair:${location.pathname}#${objet.id}`;
 
 const documentAnnotation = DocumentAnnotation.vide(null);
 const pile = new PileCommandes();
@@ -741,7 +743,7 @@ function faitsDuProjet() {
 
   faits.push({
     cle: 'Repère géométrique',
-    valeur: REPERE,
+    valeur: objet.repere,
     aide: 'Toutes les coordonnées de ce document ont été posées dans ce repère. '
       + 'Un document venu d’un autre repère est refusé au chargement.',
   });
@@ -755,6 +757,19 @@ function faitsDuProjet() {
         + `du modèle (× ${ECHELLE_MESURE.toFixed(5)})`,
       aide: 'Facteur appliqué une fois aux longueurs, deux fois aux aires, trois fois '
         + 'aux volumes. Toute mesure de ce document en dépend.',
+    });
+  } else {
+    // Silence here would be the worst outcome: without a calibration the
+    // figures are in model units, and model units are not metres — Object
+    // Capture’s own scale was out by a factor of three on the fish. A reading
+    // that looks like a measurement and is not one has to say so.
+    faits.push({
+      cle: 'Mise à l’échelle',
+      valeur: 'non calibrée',
+      aide: 'Cet objet ne déclare aucune longueur de référence dans son objet.json : '
+        + 'les chiffres sont donnés dans les unités du modèle, qui ne sont pas des '
+        + 'mètres. Mesurez une longueur réelle sur l’objet, puis renseignez '
+        + 'reglages.mesure.longueurModeleReference et longueurReelleReference.',
     });
   }
 
@@ -1068,11 +1083,18 @@ async function chargerRecalage() {
 
 // Worst residual across the captures, in model units — the honest single number
 // when a figure concerns all of them at once.
+//
+// The entries are recognised by SHAPE and not by name. They used to be called
+// « session2 », « session3 », and this loop matched that; the ingestion tool
+// keys them by capture id instead, since an object can have any number of them
+// in any order. Reading a name would have made this silently return nothing —
+// no residual shown, no error either, just figures that stopped saying what
+// they were worth.
 function residuRecalage() {
   if (!recalage) return null;
   let pire = 0;
-  for (const [cle, valeur] of Object.entries(recalage)) {
-    if (!/^session\d+$/.test(cle) || !Number.isFinite(valeur?.rmse)) continue;
+  for (const valeur of Object.values(recalage)) {
+    if (!Number.isFinite(valeur?.rmse)) continue;
     pire = Math.max(pire, valeur.rmse);
   }
   return pire || null;
@@ -1828,7 +1850,6 @@ async function choisirSession(session, index, bouton) {
   scene3d.afficherCouche(index);
   ombre.visible = true;
   requestAnimationFrame(() => scene3d.avecToutesLesCouches(() => ombre.rafraichir()));
-  definirSourcesAR(session.glb, session.usdz);
   sessionCourante = session;
   // Each capture has its own UV atlas, so the paint has to be rasterised
   // again for this one — from the same 3D strokes, which is exactly why they
@@ -1876,7 +1897,6 @@ async function choisirComposite(sessions, bouton) {
   // them not to be.
   ombre.visible = true;
   requestAnimationFrame(() => scene3d.avecToutesLesCouches(() => ombre.rafraichir()));
-  definirSourcesAR(sessions[0].glb, sessions[0].usdz);
   // Every capture is on screen at once, so no layer is out of scope.
   sessionCourante = null;
   panneauDroit.definirSessionActive(null);
@@ -1888,24 +1908,20 @@ async function choisirComposite(sessions, bouton) {
 }
 
 async function chargerSessions() {
-  let sessions;
-  try {
-    const reponse = await fetch('./sessions.json', { cache: 'no-store' });
-    if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
-    sessions = await reponse.json();
-    if (!Array.isArray(sessions) || sessions.length === 0) throw new Error('Aucune session');
-    sessionsConnues = sessions;
-    panneauDroit.definirSessions(sessions);
-  } catch (erreur) {
-    console.error('sessions.json illisible, retour au modèle par défaut.', erreur);
+  // The captures are declared by the object’s manifest, which amorce.js read
+  // and validated before this module was ever imported — so there is nothing
+  // to fetch here, and no fallback to a default model: an object with no
+  // capture is a broken manifest, and saying so beats showing someone else’s
+  // specimen under this one’s name.
+  const sessions = objet.sessions;
+  if (sessions.length === 0) {
     elements.listeSessions.hidden = true;
-    elements.sousTitre.textContent = 'Modèle par défaut';
-    const secours = { label: 'Modèle', glb: './model.glb', usdz: './model.usdz' };
-    const bouton = document.createElement('button');
-    await choisirSession(secours, 0, bouton);
-    elements.sousTitre.textContent = 'Modèle par défaut';
+    elements.sousTitre.textContent = 'Aucune capture';
+    afficherStatut(`« ${objet.nom} » ne déclare aucune capture dans son objet.json.`);
     return;
   }
+  sessionsConnues = sessions;
+  panneauDroit.definirSessions(sessions);
 
   sessions.forEach((session, index) => {
     const bouton = document.createElement('button');
@@ -1930,6 +1946,7 @@ async function chargerSessions() {
   }
 }
 
+installerListeObjets($('#objetList'));
 chargerRecalage();
 chargerSessions();
 
@@ -1938,6 +1955,9 @@ window.DURAIR = {
   // Place the specimen by hand, then read the three numbers to paste into
   // config.affichage.vueInitiale.
   vueActuelle: () => scene3d.vueActuelle(),
+  // Quel objet est ouvert, et le catalogue complet — utile pour vérifier
+  // qu’un réglage vient bien du manifeste et non des défauts partagés.
+  objet, catalogue,
   scene3d, eclairage, ombre, config, THREE, pile, panneauDroit,
   coucheEtiquettes, barreOutils, pointeur, medias: bibliotheque, atlas, pinceau,
   regions, contours, outilSelection, creerRegion,

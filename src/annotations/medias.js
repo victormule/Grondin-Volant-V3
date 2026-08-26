@@ -2,11 +2,13 @@
 //
 // Two lives for one file. While you work, it is a blob in IndexedDB — dropped
 // in, available at once, never uploaded anywhere. On export it becomes a file
-// under annotations/medias/, and the published document points at it by path.
+// under <objet>/annotations/medias/, and the published document points at it
+// by path.
 // The site therefore reads published media with a plain URL and needs no
 // archive reader at all: only the writer.
 
 import { ouvrir, transaction, MAGASIN_MEDIAS } from '../document/stockage.js';
+import { objet } from '../objet.js';
 
 const LARGEUR_MAX = 1800;
 const QUALITE = 0.85;
@@ -92,7 +94,7 @@ export class BibliothequeMedias {
   // IndexedDB under the id the document already refers to, and `chemin` is
   // cleared: the media now lives in this browser, not at a path on a server
   // that has never heard of it. Without that reset an imported card would look
-  // for ./annotations/medias/… and show a hole.
+  // for the object’s annotations/medias/… and show a hole.
   async adopter(media, blob) {
     const db = await ouvrir();
     await transaction(db, 'readwrite',
@@ -107,7 +109,7 @@ export class BibliothequeMedias {
 
   async blob(media) {
     if (media.chemin) {
-      const reponse = await fetch(`./annotations/${media.chemin}`);
+      const reponse = await fetch(`${objet.chemins.medias}/${media.chemin}`);
       if (!reponse.ok) throw new Error(`Média introuvable : ${media.chemin}`);
       return await reponse.blob();
     }
@@ -122,7 +124,7 @@ export class BibliothequeMedias {
   // Published media resolve to a plain path; local ones to an object URL,
   // cached so a card can be reopened without leaking a URL each time.
   async url(media) {
-    if (media.chemin) return `./annotations/${media.chemin}`;
+    if (media.chemin) return `${objet.chemins.medias}/${media.chemin}`;
     if (this.urls.has(media.id)) return this.urls.get(media.id);
     try {
       const blob = await this.blob(media);

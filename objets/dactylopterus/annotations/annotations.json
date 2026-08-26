@@ -1,0 +1,52 @@
+{
+  "version": 3,
+  "repere": "socle-net-2026-08",
+  "sessionReference": "C6736D68-4A9E-4243-85A3-47966CE779A6",
+  "racine": {
+    "id": "racine",
+    "type": "groupe",
+    "enfants": []
+  },
+  "medias": [],
+  "projet": {
+    "titre": "Dossier de démonstration — conservation d’un grondin volant naturalisé",
+    "objectif": "Démontrer un relevé 3D complet associant repérage anatomique, constat d’état, décisions de traitement et traçabilité des interventions. Toutes les personnes, valeurs de traitement et observations de ce dossier sont fictives, bien que construites pour rester techniquement cohérentes.",
+    "commanditaire": "Muséum fictif d’Histoire naturelle — service des collections",
+    "objet": {
+      "designation": "Spécimen naturalisé de grondin volant sur socle",
+      "taxon": "Dactylopterus volitans (Linnaeus, 1758) — attribution de démonstration",
+      "inventaire": "DEMO-ICH-2026-001",
+      "materiaux": "Peau naturalisée, éléments osseux, charges et liant de préparation, couche colorée et vernis, tige métallique, socle en bois peint",
+      "dimensions": "L. 19 cm ; envergure env. 27 cm ; H. avec socle env. 15 cm",
+      "conservation": "Réserve d’étude fictive — armoire ICH-04"
+    },
+    "intervenants": [
+      {
+        "nom": "Élise Martin (personnage fictif)",
+        "role": "Responsable scientifique"
+      },
+      {
+        "nom": "Nora Benali (personnage fictif)",
+        "role": "Conservatrice-restauratrice"
+      },
+      {
+        "nom": "Lucas Perrin (personnage fictif)",
+        "role": "Opérateur photogrammétrie"
+      }
+    ],
+    "campagne": {
+      "lieu": "Atelier de conservation fictif — plateau de numérisation",
+      "debut": "2026-06-18",
+      "fin": "2026-07-12"
+    },
+    "methode": {
+      "technique": "Photogrammétrie multi-vues, examen visuel, lumière rasante et loupe 10×",
+      "materiel": "Boîtier plein format 45 Mpx, objectif macro 50 mm, charte colorimétrique, Éclairage LED CRI > 95",
+      "logiciels": "Chaîne photogrammétrique de démonstration ; Durair Viewer",
+      "echelle": "Échelle automatique du viewer : 0,59 unité de modèle = 0,19 m réel. Les valeurs des fiches sont indicatives et assorties d’une incertitude fictive cohérente avec le recalage. Les points, peintures et mesures sont enregistrés dans le repère partagé socle-net-2026-08."
+    },
+    "references": "DOS-DEMO-2026-001 — fiche de conservation fictive\nPROTO-DEMO-CR-04 — protocole fictif de traitement\nJeu de données conçu uniquement pour tester l’import et l’interface du viewer.",
+    "cree": "2026-06-18T08:30:00.000Z",
+    "modifie": "2026-07-12T16:00:00.000Z"
+  }
+}

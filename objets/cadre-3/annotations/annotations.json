@@ -1,0 +1,11 @@
+{
+  "version": 3,
+  "repere": "cadre-3/oc-2026-08",
+  "sessionReference": "0EB4D665-605A-47C8-BE66-5A8A6D97E6C7",
+  "racine": {
+    "id": "racine",
+    "type": "groupe",
+    "enfants": []
+  },
+  "medias": []
+}

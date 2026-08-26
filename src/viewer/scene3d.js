@@ -138,7 +138,7 @@ export class Scene3D {
   // coordinate frame (the meshes were aligned onto session 1), so switching
   // sessions is just a visibility swap — no reframing, no camera jump.
   // Indexed by session so the composite stack keeps the order of
-  // sessions.json, whatever order the user happened to load them in.
+  // the manifest, whatever order the user happened to load them in.
   definirCouche(index, objet) {
     objet.visible = false;
     this.scene.add(objet);

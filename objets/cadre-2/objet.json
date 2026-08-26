@@ -1,0 +1,51 @@
+{
+  "nom": "Cadre 2",
+  "repere": "cadre-2/oc-2026-08",
+  "recalage": "sessions/_recalage.json",
+  "sessions": [
+    {
+      "id": "48F31E95-A0F2-4679-B10C-54736F8BDD4C",
+      "label": "Capture 1",
+      "date": "26 août 2026",
+      "time": "10:06 – 10:10",
+      "glb": "sessions/48F31E95-A0F2-4679-B10C-54736F8BDD4C/model.glb"
+    },
+    {
+      "id": "9E5790DA-2D4C-4C29-81FF-FC9FCA8F2192",
+      "label": "Capture 2",
+      "date": "26 août 2026",
+      "time": "10:12 – 10:16",
+      "glb": "sessions/9E5790DA-2D4C-4C29-81FF-FC9FCA8F2192/model.glb"
+    }
+  ],
+  "reglages": {
+    "camera": {
+      "distanceMin": 0.24,
+      "distanceMax": 12
+    },
+    "peinture": {
+      "taille": 43,
+      "tailleGomme": 52
+    },
+    "affichage": {
+      "vueInitiale": {
+        "azimut": 0,
+        "elevation": 20,
+        "marge": 1
+      },
+      "aplomb": null,
+      "axeRotation": {
+        "point": [
+          0,
+          -3.72529e-9,
+          0
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ]
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # Métadonnées macOS. Les fichiers « ._quelquechose » sont des forks de
 # ressources créés par le Finder sur les volumes non-HFS ; ils n'ont aucun
-# contenu utile et il y en a plusieurs centaines dans sessions/.
+# contenu utile.
 ._*
 .DS_Store
 .Spotlight-V100
@@ -11,6 +11,7 @@ desktop.ini
 # Outils
 node_modules/
 *.log
+.verif/
 
 # ---------------------------------------------------------------------------
 # HORS SITE
@@ -21,7 +22,7 @@ node_modules/
 README.md
 README.txt
 PLAN_ANNOTATIONS.md
-annotations/LISEZ-MOI.txt
+objets/*/annotations/LISEZ-MOI.txt
 
 # Ancienne version, gardée pour comparaison.
 index-model-viewer.html
@@ -29,54 +30,57 @@ index-model-viewer.html
 # Script de nettoyage des nageoires, hors chaîne de rendu.
 tools_clean_fins.py
 
-# Métadonnées de l'export dür.air : aucun code ne les lit.
-project_metadata.json
-sessions/*/session_metadata.json
-sessions/_alignment_transforms.json
+# ---------------------------------------------------------------------------
+# MATIÈRE PREMIÈRE DE L'INGESTION
+#
+# Les exports dür.air bruts, d'où sont tirés les .glb servis par le site. Le
+# navigateur ne les demande jamais : ce sont des OBJ, des MTL, des textures PNG
+# et des USDZ, que outils/ingerer.mjs transforme en un objets/<id>/ publiable.
+#
+# Ils ont de la valeur — ce sont eux qui permettent de refaire un modèle — mais
+# ils n'ont rien à faire dans un dépôt Git, qui conserve chaque version de
+# chaque binaire pour toujours. Gardez-les sauvegardés ailleurs.
+#
+# Les photos d'origine et les nuages ARKit sont, eux, déjà sortis du projet :
+# voir « Francois - sources brutes » à côté.
+# La barre oblique initiale ancre la règle À LA RACINE, et elle est
+# indispensable : git tourne ici avec core.ignorecase = true, si bien qu’un
+# motif « Cadre*/ » non ancré attrape aussi objets/cadre-1/. Les quatre cadres
+# ingérés seraient alors absents du dépôt, le catalogue les listerait quand
+# même, et le site déployé renverrait 404 sur leurs manifestes.
+/Cadre*/
 
 # ---------------------------------------------------------------------------
-# SOURCES DE PHOTOGRAMMÉTRIE
+# CE QUI EST PUBLIÉ
 #
-# Le visualiseur ne lit qu'un fichier par session : photogrammetry/model.glb
-# (plus le .usdz pour la vue AR sur iOS). Tout le reste de sessions/ est la
-# matière première dont ces deux fichiers ont été tirés — 400 Mo de photos et
-# de formats intermédiaires que le site ne demande jamais.
+# objets/ est le seul dossier de données que le site lit :
 #
-# Ces sources ont de la valeur : elles sont irremplaçables et permettent de
-# régénérer les modèles. Elles n'ont simplement rien à faire dans un dépôt Git,
-# qui conserve chaque version de chaque binaire pour toujours. Gardez-les
-# sauvegardées ailleurs (disque externe, stockage objet).
-
-# Les photos d'origine de chaque session.
-sessions/*/captures/
-
-# Formats intermédiaires : le .glb livré en contient déjà la géométrie et les
-# textures.
-sessions/*/photogrammetry/*.obj
-sessions/*/photogrammetry/*.mtl
-sessions/*/photogrammetry/*_textures/
-sessions/*/photogrammetry/*_metadata.json
-
-# Session non référencée par sessions.json : rien ne la charge.
-sessions/91D4BE57-FE01-49B7-847D-A0044DAF6CC2/
-
-# Les .glb servis embarquent leurs textures en WebP (11,4 Mo → 1,9 Mo). Les
-# versions d'origine, à textures PNG, sont conservées à côté pour pouvoir
-# refaire la conversion à une autre qualité — mais elles pèsent six fois plus
-# et le site ne les lit jamais.
+#   objets/catalogue.json          la liste des objets proposés
+#   objets/<id>/objet.json         captures, repère, réglages propres à l'objet
+#   objets/<id>/sessions/…/*.glb   le maillage affiché (textures en WebP)
+#   objets/<id>/sessions/_recalage.json   résidus d'alignement entre captures
+#   objets/<id>/annotations/       le document publié et ses médias
 #
-#   gltf-transform webp model.original.glb model.glb --quality 90
+# Les .glb servis portent leurs textures en WebP plutôt qu'en PNG : 11,4 Mo →
+# 1,9 Mo par capture, à résolution inchangée (2048²). Les originaux à textures
+# PNG restent hors dépôt.
 *.original.glb
 
-# Sauvegardes du redressement de la géométrie. Les fichiers d’origine sont
-# déjà dans l’historique git : ces copies sont un filet local, pas une archive.
+# Sauvegardes locales d'une transformation de géométrie. Les fichiers d'origine
+# sont déjà dans l'historique git : ces copies sont un filet, pas une archive.
 *.avant-redressement
 
-# Export manuel fait en testant le bouton « Exporter » — un double de
-# annotations/annotations.json (le fichier que le site charge réellement,
-# via CHEMIN_PUBLIE) plus un média, posé à la racine par le navigateur.
+# Export manuel produit en testant le bouton « Exporter » — un double du
+# document publié, posé par le navigateur là où il tombe.
 annotations.zip
 
-# Images de test, jamais référencées par le code.
-chelidonichthys.jpg
-images.jpg
+# La réalité augmentée a été retirée : les .usdz pesaient 95 Mo contre 12 Mo de
+# .glb, pour une fonction que seul Quick Look sur iOS savait ouvrir. Cette ligne
+# empêche un export dür.air d'en réintroduire par mégarde.
+*.usdz
+
+# Travail conserve mais non publie : le site ne lit que annotations.json.
+objets/*/annotations/annotations.non-publie.json
+
+# Message de commit, jetable.
+.commit-msg.txt

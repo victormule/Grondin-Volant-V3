@@ -1,5 +1,22 @@
 // Réglages du visualiseur — modifiez les valeurs puis rechargez la page.
-// (Ce fichier est volontairement simple : aucune compilation n'est nécessaire.)
+// (Ce fichier est volontairement simple : aucune compilation n’est nécessaire.)
+//
+// CE FICHIER NE CONTIENT QUE CE QUE TOUS LES OBJETS PARTAGENT.
+//
+// Le site sert un catalogue : objets/catalogue.json le liste, et chaque objet
+// se décrit dans son propre objets/<id>/objet.json — ses captures, son repère
+// géométrique, et un bloc "reglages" fusionné PAR-DESSUS ce fichier.
+//
+// La règle de partage est simple : ce qui dépend de l’objet va dans son
+// manifeste, le reste ici. Dépendent de l’objet son échelle réelle, sa vue
+// d’ouverture, son aplomb, son axe de rotation, la taille du pinceau en
+// millimètres sur sa surface, et les distances de caméra. Une valeur héritée à
+// tort d’un autre objet donne au mieux un cadrage étrange, au pire des chiffres
+// faux sans que rien ne le signale — c’est pourquoi l’échelle n’a aucun défaut
+// ici.
+//
+// Ordre de fusion : défauts de src/reglages.js, puis ce fichier, puis le
+// manifeste de l’objet ouvert.
 
 window.VIEWER_CONFIG = {
 
@@ -66,7 +83,7 @@ window.VIEWER_CONFIG = {
 
     // Aspect métallique : 0 pour un spécimen naturel. À laisser à 0
     // sauf effet volontairement métallique.
-    metal: 0.8,
+    metal: 0,
 
     // Opacité globale du modèle. Elle multiplie l'opacité propre des matériaux
     // (les membranes des nageoires restent donc corrigées à 45 % de cette valeur)
@@ -152,11 +169,16 @@ window.VIEWER_CONFIG = {
 
   // ---------------------------------------------------------------- MESURE
   mesure: {
-    // Échelle automatique : une longueur affichée comme 59 cm dans les unités
-    // du modèle correspond à 19 cm sur le spécimen réel. Longueurs, aires et
-    // volumes sont convertis respectivement avec ce rapport, son carré et son cube.
-    longueurModeleReference: 0.59,
-    longueurReelleReference: 0.19,
+    // ÉCHELLE — PROPRE À CHAQUE OBJET, déclarée dans son objets/<id>/objet.json.
+    //
+    // Elle n’a volontairement pas de valeur par défaut ici. Object Capture ne
+    // rend pas des mètres : sur le grondin, 59 cm de modèle valaient 19 cm réels,
+    // et le facteur diffère d’une capture à l’autre du même objet. Une valeur
+    // héritée d’un autre objet donnerait des longueurs, des aires et des volumes
+    // faux sans que rien ne le signale — la fiche du projet dit « non calibrée »
+    // tant que les deux longueurs manquent.
+    //
+    //   "mesure": { "longueurModeleReference": 0.59, "longueurReelleReference": 0.19 }
 
     // Mode de mesure au chargement.
     //   'droite'  : distance à vol d'oiseau entre deux points, comme un pied
@@ -213,12 +235,14 @@ window.VIEWER_CONFIG = {
     // été mesurée. Il vient du tableau de calibration plus haut, à 1024.
     incertitudeAire: 0.001,
 
-    // RECALAGE DES CAPTURES — fichier produit à l'alignement, qui contient le
-    // résidu (RMSE) de chaque session sur la session de référence. C'est
-    // l'incertitude de position d'une annotation vue sur une autre capture que
+    // RECALAGE DES CAPTURES — fichier produit à l’alignement, qui contient le
+    // résidu (RMSE) de chaque capture sur la capture de référence. C’est
+    // l’incertitude de position d’une annotation vue sur une autre capture que
     // celle où elle a été posée ; elle est affichée telle quelle plutôt que
     // passée sous silence.
-    recalage: './sessions/_alignment_transforms.json',
+    //
+    // Le chemin vient du manifeste de l’objet (champ "recalage"), pas d’ici :
+    // chaque objet a le sien, à côté de ses captures.
   },
 
   // ------------------------------------------------------------- SÉLECTION
@@ -305,56 +329,34 @@ window.VIEWER_CONFIG = {
 
     // Panneau de calques (à droite) ouvert au chargement.
     panneauCalquesOuvert: true,
-    // VUE D'OUVERTURE — celle du chargement, et celle où « Recentrer » revient.
-    //
-    // Des angles plutôt qu'une position de caméra enregistrée : la distance de
-    // cadrage se recalcule sur la boîte englobante, si bien que le spécimen
-    // occupe la même part de l'image quelle que soit sa taille et quelle que
-    // soit la fenêtre.
-    //
-    //   azimut    : rotation autour de la verticale, en degrés. 0 regarde
-    //               depuis +Z, 90 depuis +X.
-    //   elevation : hauteur au-dessus de l'horizon, en degrés. 0 est de niveau,
-    //               90 à la verticale au-dessus.
-    //   marge     : multiplie la distance. 1 laisse le cadrage automatique,
-    //               au-dessus on recule, en dessous on serre.
-    //
-    // Pour en choisir une autre : placez le spécimen à la main dans la vue,
-    // puis tapez DURAIR.vueActuelle() dans la console — les trois nombres à
-    // recopier ici en sortent.
-    vueInitiale: { azimut: 87, elevation: 30, marge: 0.85 },
 
     // Vitesse de la rotation automatique, en degrés par seconde.
     vitesseRotation: 18,
 
-    // APLOMB — la verticale du spécimen, quand elle diffère de celle du monde.
+    // AXE DE LA ROTATION AUTOMATIQUE, APLOMB, VUE D’OUVERTURE — les trois sont
+    // PROPRES À CHAQUE OBJET et vivent dans son objets/<id>/objet.json.
     //
-    // null depuis que la géométrie a été redressée dans les fichiers eux-mêmes :
-    // les captures arrivaient avec un socle penché de 4,0°, elles sont
-    // maintenant écrites de niveau. Le contrôle après coup donne 0,17°, 0,42° et
-    // 0,17° sur les trois captures.
+    //   "affichage": {
+    //     "vueInitiale": { "azimut": 87, "elevation": 30, "marge": 0.85 },
+    //     "aplomb": null,
+    //     "axeRotation": { "point": [0, 0, 0], "direction": [0, 1, 0] }
+    //   }
     //
-    // Renseignez une normale ici si vous chargez un jour des captures brutes :
-    // faites-en tourner la caméra plutôt que la géométrie tant que des
-    // annotations existent, car elles sont écrites dans le repère des fichiers.
-    aplomb: null,
-
-    // AXE DE LA ROTATION AUTOMATIQUE — un point qu'il traverse et sa direction.
+    // vueInitiale : des angles plutôt qu’une position de caméra enregistrée, si
+    //   bien que la distance se recalcule sur la boîte englobante et que l’objet
+    //   occupe la même part de l’image quelle que soit sa taille. Pour en choisir
+    //   une : placez l’objet à la main, puis tapez DURAIR.vueActuelle() dans la
+    //   console — les trois nombres à recopier en sortent.
     //
-    // Sans lui, la rotation tourne autour de la verticale passant par le centre
-    // de la boîte englobante — ce qui, avant le rognage, tombait au milieu de
-    // la nappe : le poisson décrivait un grand cercle autour d'un axe qui ne le
-    // traversait pas, un manège plutôt qu'un tour de socle.
+    // aplomb : la verticale de l’objet quand elle diffère de celle du monde.
+    //   null quand la géométrie est déjà de niveau dans les fichiers, ce qui est
+    //   le cas des sorties Object Capture (origine au pied, min.y = 0). Ne fait
+    //   tourner que la caméra, jamais la géométrie : les annotations sont écrites
+    //   dans le repère des fichiers et les retourner les arracherait de l’objet.
     //
-    // Le redressement a posé l'origine au pied de la tige et le socle à plat,
-    // si bien que l'axe cherché est devenu l'axe Y lui-même. On l'écrit quand
-    // même explicitement : la boîte englobante reste bien plus large que le
-    // socle — les nageoires débordent de part et d'autre — donc son centre ne
-    // retomberait pas sur la tige.
-    axeRotation: {
-      point: [0, 0, 0],
-      direction: [0, 1, 0],
-    },
+    // axeRotation : un point que l’axe traverse et sa direction. Sans lui, la
+    //   rotation tourne autour du centre de la boîte englobante — qui, sur un
+    //   objet plus large que son socle, ne tombe pas sur le socle.
 
     // Mode « Toutes les sessions ».
     // 'auto' (recommandé) : chaque capture pèse exactement 1/3 du résultat,

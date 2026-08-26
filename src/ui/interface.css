@@ -105,18 +105,11 @@ button:hover {
 .panel button:hover,
 .reglages-outil button:hover,
 .panel-toggle:hover,
-.ar-button:hover {
-  transform: translateY(-1px);
-}
 
 .panel button:active,
 .barre-outils button:active,
 .reglages-outil button:active,
 .panel-toggle:active,
-.ar-button:active {
-  transform: translateY(0);
-  transition-duration: 70ms;
-}
 
 button:focus-visible,
 input:focus-visible,
@@ -1186,14 +1179,6 @@ body:has(.panneau-calques.collapsed) .barre-outils {
   transform: translateX(-50%);
 }
 
-.ar-button {
-  right: 1rem;
-  bottom: 1rem;
-  border-color: transparent;
-  background: var(--button);
-  box-shadow: var(--ombre-flottante);
-  color: var(--button-text);
-}
 
 .mesure-etiquette {
   border-color: var(--border);

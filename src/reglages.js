@@ -75,3 +75,23 @@ function fusionner(base, ajout) {
 }
 
 export const config = fusionner(defauts, window.VIEWER_CONFIG || {});
+
+// Merges one object's settings into the exported object IN PLACE.
+//
+// config.js now holds only what every object shares; an object's own manifest
+// carries what is true of it alone — its scale calibration, its opening view,
+// its brush size in millimetres on a surface that is not the same size as the
+// last one.
+//
+// It has to mutate rather than replace. Every module holds `config` by
+// reference, and a good many read it as they are imported: the light sliders,
+// the background palette, the measurement scale are all wired up while app.js
+// is still being evaluated. Handing out a new object here would leave all of
+// them reading the defaults for ever. amorce.js guarantees this runs before
+// app.js is imported at all.
+export function appliquer(reglages) {
+  const fusionne = fusionner(config, reglages ?? {});
+  for (const cle of Object.keys(config)) delete config[cle];
+  Object.assign(config, fusionne);
+  return config;
+}

@@ -2,15 +2,18 @@
 // to, so work lives in the browser and leaves it only when explicitly exported.
 //
 // Two sources, deliberately kept apart:
-//   • annotations/annotations.json — the published document, read-only here.
+//   • <objet>/annotations/annotations.json — the published document, read-only here.
 //   • IndexedDB — the local draft, this browser only.
 // A visitor's edits therefore never touch what is deployed. Only the export
 // button produces a file, and only you decide to put it online.
 
+import { objet } from '../objet.js';
+
 const BASE = 'durair-annotations';
 const MAGASIN = 'documents';
 export const MAGASIN_MEDIAS = 'medias';
-const CHEMIN_PUBLIE = './annotations/annotations.json';
+// Was a constant when the site served one specimen. Each object now carries
+// its own published document, next to its own captures.
 
 export function ouvrir() {
   return new Promise((resoudre, rejeter) => {
@@ -77,7 +80,8 @@ export async function supprimerBrouillon(idProjet) {
 // Absent file is the normal case before anything has been published.
 export async function chargerPublie() {
   try {
-    const reponse = await fetch(CHEMIN_PUBLIE, { cache: 'no-store' });
+    if (!objet.chemins.annotations) return null;
+    const reponse = await fetch(objet.chemins.annotations, { cache: 'no-store' });
     if (!reponse.ok) return null;
     return await reponse.json();
   } catch {

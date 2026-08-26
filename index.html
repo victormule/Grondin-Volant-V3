@@ -4,7 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Visualisation interactive de sessions de photogrammétrie 3D.">
-  <title>Dactylopterus Volantis — Visualisation 3D</title>
+  <!-- Remplacé au démarrage par le nom de l’objet ouvert (voir src/amorce.js) :
+       le catalogue en sert plusieurs, et l’onglet doit dire lequel. -->
+  <title>Visualisation 3D</title>
 
   <!-- Sans cette ligne le navigateur réclame /favicon.ico et journalise une
        erreur 404 à chaque chargement. Remplacez la valeur par le chemin d'une
@@ -1885,15 +1887,6 @@
 
     .viewer-status.visible { opacity: 1; }
 
-    .ar-button {
-      position: fixed;
-      right: 1rem;
-      bottom: 3.6rem;
-      z-index: 3;
-      background: var(--button);
-      color: var(--button-text);
-      border-color: transparent;
-    }
 
     @media (max-width: 640px) {
       :root { --panel-width: 100%; --panneau-droit: 100%; }
@@ -2120,8 +2113,6 @@
   <p class="viewer-status" id="viewerStatus" role="status"></p>
   <p class="hint" id="hint">Clic gauche : rotation · clic droit : déplacement · molette : zoom</p>
 
-  <button class="ar-button" id="arButton" type="button" hidden>Voir dans l’espace</button>
-
   <button class="panel-toggle panel-open" id="panelToggle" type="button" aria-expanded="true" aria-controls="panel" title="Replier le panneau">
     <span id="panelToggleIcon" aria-hidden="true">◀</span>
     <span class="visually-hidden" id="panelToggleLabel">Replier le panneau</span>
@@ -2142,14 +2133,22 @@
       <button class="title-group" id="ouvrirProjet" type="button"
         title="Ouvrir la fiche du projet — objet, intervenants, campagne, méthode">
         <span class="panel-kicker">Atelier d’observation 3D</span>
-        <h1 id="projectTitle">Dactylopterus Volantis</h1>
+        <h1 id="projectTitle">Chargement…</h1>
         <p id="projectSubtitle">Chargement…</p>
         <span class="projet-appel" id="projetAppel" hidden></span>
       </button>
     </header>
 
+    <!-- Le catalogue au-dessus des captures : quel objet, puis quelle prise
+         de vue de cet objet. La section se retire d'elle-même quand le
+         catalogue n'en compte qu'un. -->
+    <div class="group panel-section" data-section="objets" hidden>
+      <span class="group-title">Objets</span>
+      <div class="session-list" id="objetList"></div>
+    </div>
+
     <div class="group panel-section" data-section="sessions">
-      <span class="group-title">Sessions</span>
+      <span class="group-title">Captures</span>
       <div class="session-list" id="sessionList"></div>
     </div>
 
@@ -2319,6 +2318,9 @@
        part, où l'on cesse de regarder le spécimen pour regarder le dossier. -->
   <div class="projet-voile" id="projetVoile" hidden></div>
 
-  <script type="module" src="./src/app.js"></script>
+  <!-- L’amorce résout l’objet demandé, charge son manifeste, puis importe
+       l’application : les réglages doivent être en place AVANT que app.js ne
+       s’évalue, car il les lit au niveau module. -->
+  <script type="module" src="./src/amorce.js"></script>
 </body>
 </html>

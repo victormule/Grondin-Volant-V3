@@ -5,6 +5,8 @@
 // the others — which is the whole point of annotating this project. A layer can
 // still be pinned to particular captures through its `portee`.
 
+import { objet } from '../objet.js';
+
 // Which coordinate frame the stored coordinates belong to.
 //
 // Everything in a document — pin positions, brush dabs, measurement points — is
@@ -14,9 +16,12 @@
 // about it looks wrong enough to notice.
 //
 // So a document carries the name of the frame it was written in, and one that
-// does not match this build is refused rather than drawn. Bump this string
-// whenever the geometry is moved again.
-export const REPERE = 'socle-net-2026-08';
+// does not match is refused rather than drawn. The name used to be a constant
+// of the build, back when the site served a single specimen; it now belongs to
+// the object, declared in its objet.json — redressing one cadre has no bearing
+// on what was annotated on another. Bump it there whenever that object’s
+// geometry moves.
+export const repereCourant = () => objet.repere;
 
 // Version 2 is the one where an annotation became a layer of its own, and where
 // every element says what it is instead of relying on its layer's type to say
@@ -450,7 +455,7 @@ export class DocumentAnnotation {
   static frameCompatible(donnees) {
     if (!donnees) return false;
     if ((donnees.racine?.enfants?.length ?? 0) === 0) return true;
-    return donnees.repere === REPERE;
+    return donnees.repere === objet.repere;
   }
 
   static vide(sessionReference) {
@@ -675,7 +680,7 @@ export class DocumentAnnotation {
       version: VERSION,
       // Stamped, never copied: whatever was loaded, what is being written now
       // was authored against the geometry this build ships.
-      repere: REPERE,
+      repere: objet.repere,
       sessionReference: this.sessionReference,
       racine: structuredClone(this.racine),
       medias: structuredClone(this.medias),

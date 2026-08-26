@@ -1,0 +1,27 @@
+[
+  {
+    "id": "dactylopterus",
+    "nom": "Dactylopterus Volantis",
+    "detail": "Grondin volant · 3 captures"
+  },
+  {
+    "id": "cadre-1",
+    "nom": "Cadre 1",
+    "detail": "3 captures · non calibré"
+  },
+  {
+    "id": "cadre-2",
+    "nom": "Cadre 2",
+    "detail": "2 captures · non calibré"
+  },
+  {
+    "id": "cadre-3",
+    "nom": "Cadre 3",
+    "detail": "1 capture · non calibré"
+  },
+  {
+    "id": "cadre-4",
+    "nom": "Cadre 4",
+    "detail": "1 capture · non calibré"
+  }
+]

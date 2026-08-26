@@ -1,0 +1,83 @@
+{
+  "nom": "Dactylopterus Volantis",
+  "repere": "socle-net-2026-08",
+  "recalage": "sessions/_recalage.json",
+  "sessions": [
+    {
+      "id": "C6736D68-4A9E-4243-85A3-47966CE779A6",
+      "label": "Session 1",
+      "date": "18 juin 2026",
+      "time": "11:30 – 11:47",
+      "glb": "sessions/C6736D68-4A9E-4243-85A3-47966CE779A6/model.glb"
+    },
+    {
+      "id": "98417501-5E79-4190-B2FA-204027349C01",
+      "label": "Session 2",
+      "date": "18 juin 2026",
+      "time": "11:47 – 12:04",
+      "glb": "sessions/98417501-5E79-4190-B2FA-204027349C01/model.glb"
+    },
+    {
+      "id": "2E2A96D7-F487-42B2-8BC0-C90523136F94",
+      "label": "Session 3",
+      "date": "18 juin 2026",
+      "time": "12:08 – 12:19",
+      "glb": "sessions/2E2A96D7-F487-42B2-8BC0-C90523136F94/model.glb"
+    }
+  ],
+  "reglages": {
+    "matiere": {
+      "rugosite": 0.7,
+      "metal": 0.8,
+      "opacite": 1
+    },
+    "ombre": {
+      "intensite": 0.7,
+      "douceur": 0.8,
+      "taillePlan": 1.8,
+      "hauteur": 0.7
+    },
+    "camera": {
+      "distanceMin": 0.4,
+      "distanceMax": 14
+    },
+    "light": {
+      "dirigee": {
+        "ambiance": 0.32,
+        "intensite": 4,
+        "x": -0.55,
+        "y": 0.5,
+        "angleMax": 110
+      }
+    },
+    "peinture": {
+      "taille": 20,
+      "tailleGomme": 24,
+      "seuilNormale": 0
+    },
+    "mesure": {
+      "longueurModeleReference": 0.59,
+      "longueurReelleReference": 0.19
+    },
+    "affichage": {
+      "vueInitiale": {
+        "azimut": 87,
+        "elevation": 30,
+        "marge": 0.85
+      },
+      "aplomb": null,
+      "axeRotation": {
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ]
+      }
+    }
+  }
+}
