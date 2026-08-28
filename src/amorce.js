@@ -30,6 +30,38 @@ function echouer(message, erreur) {
   if (sousTitre) sousTitre.textContent = 'Chargement impossible';
 }
 
+// TROIS CENT MILLE OCTETS DE three.js, DEMANDÉS DEUX ALLERS-RETOURS PLUS TÔT.
+//
+// app.js importe three à sa première ligne, mais app.js n'est lui-même importé
+// qu'une fois le manifeste lu : le navigateur ne découvre donc la plus grosse
+// ressource de la page qu'après le catalogue ET le manifeste. Ces liens la font
+// chercher pendant que le manifeste voyage. Rien n'est exécuté — modulepreload
+// télécharge et analyse, l'ordre d'évaluation reste celui des imports — et un
+// navigateur qui ne connaît pas ce type de lien l'ignore sans dommage.
+//
+// Appelé seulement quand un objet est demandé. La page d'accueil n'a pas de 3D,
+// et lui faire télécharger three.js serait lui faire payer une bibliothèque
+// qu'elle n'ouvre pas.
+function prechargerLeVisualiseur() {
+  // L'adresse de three vient de la carte d'import, elle n'est pas recopiée :
+  // deux adresses à tenir d'accord finissent par diverger.
+  let three = null;
+  try {
+    const carte = document.querySelector('script[type="importmap"]');
+    three = JSON.parse(carte?.textContent ?? '{}').imports?.three ?? null;
+  } catch (erreur) {
+    console.warn('Carte d’import illisible : préchargement ignoré.', erreur);
+  }
+  for (const adresse of [three, './app.js']) {
+    if (!adresse) continue;
+    const lien = document.createElement('link');
+    lien.rel = 'modulepreload';
+    lien.href = adresse;
+    if (/^https?:/.test(adresse)) lien.crossOrigin = 'anonymous';
+    document.head.appendChild(lien);
+  }
+}
+
 async function lire(chemin, quoi) {
   const reponse = await fetch(chemin, { cache: 'no-store' });
   if (!reponse.ok) throw new Error(`${quoi} : HTTP ${reponse.status} sur ${chemin}`);
@@ -60,6 +92,7 @@ try {
     document.title = 'Art’Scanner';
   } else {
 
+    prechargerLeVisualiseur();
     const manifeste = await lire(`./objets/${entree.id}/objet.json`, 'Manifeste illisible');
     definirObjet(entree.id, manifeste);
     appliquer(manifeste.reglages);

@@ -1,0 +1,38 @@
+# ART'SCANNER SE DÉPLOIE SANS RIEN CONSTRUIRE.
+#
+# Le dépôt EST le site : du HTML, des modules ES que le navigateur charge tels
+# quels, une feuille de style, des .glb. Rien à compiler, donc aucune commande
+# de construction — et surtout aucune dépendance à installer.
+#
+# C'est ce dernier point qui faisait échouer le déploiement. Un package.json
+# traînait à la racine ; Netlify en déduisait un projet Node et lançait un
+# « npm install » de la chaîne d'ingestion — sharp, gltf-transform, obj2gltf,
+# trois cents mégaoctets d'outils dont le navigateur n'a jamais besoin — qui
+# s'arrêtait sur un conflit de version. Un site statique tombait pour une
+# dépendance qu'il n'utilise pas.
+#
+# Ces outils vivent désormais dans outils/, avec leur propre package.json. La
+# racine ne contient plus que ce qu'un navigateur va chercher, et il n'y a plus
+# rien ici qu'un hébergeur puisse croire devoir installer.
+
+[build]
+  publish = "."
+  command = "echo 'Site statique : rien a construire.'"
+
+# LA DURÉE DE CACHE RESTE CELLE DE NETLIFY, ET C'EST VOULU.
+#
+# Aucun fichier publié ne porte d'empreinte de contenu dans son nom :
+# objets/<id>/sessions/<uuid>/model.glb garde son chemin quand le modèle est
+# réingéré. Un « max-age » long servirait donc le modèle du mois dernier à qui
+# est déjà venu. Le défaut de Netlify — ETag et revalidation — redemande le
+# fichier et reçoit un 304 vide s'il n'a pas bougé : un aller-retour, jamais
+# les quatre mégaoctets du nuage LiDAR.
+#
+# Ce bloc n'ajoute donc que des en-têtes de sécurité. « nosniff » interdit au
+# navigateur de deviner un type MIME à la place du serveur ; la politique de
+# référent évite d'annoncer le chemin complet de la page à un tiers.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

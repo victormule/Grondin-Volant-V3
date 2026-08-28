@@ -1,0 +1,21 @@
+{
+  "name": "artscanner-outils",
+  "private": true,
+  "type": "module",
+  "description": "Chaîne d'ingestion et outils de vérification d'Art'Scanner. Le site, à la racine, n'a aucune dépendance : ces paquets ne servent qu'à fabriquer les .glb qu'il sert. Ils vivent ici pour que la racine publiée ne contienne rien qu'un navigateur n'aille chercher — et pour qu'aucun hébergeur n'essaie de les installer.",
+  "scripts": {
+    "verifier": "cd .. && node outils/verifier.mjs",
+    "ingerer": "cd .. && node outils/ingerer.mjs",
+    "apercu": "cd .. && node outils/apercu.mjs"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.1.1",
+    "@gltf-transform/extensions": "^4.1.1",
+    "@gltf-transform/functions": "^4.1.1",
+    "obj2gltf": "^3.1.6",
+    "sharp": "^0.35.4"
+  },
+  "overrides": {
+    "sharp": "$sharp"
+  }
+}
