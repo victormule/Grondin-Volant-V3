@@ -359,10 +359,20 @@ window.VIEWER_CONFIG = {
     //   objet plus large que son socle, ne tombe pas sur le socle.
 
     // Mode « Toutes les sessions ».
-    // 'auto' (recommandé) : chaque capture pèse exactement 1/3 du résultat,
-    // ce qui donne une vraie moyenne des trois sans délaver les couleurs.
-    // Vous pouvez forcer une valeur (ex. 0.5) pour appliquer la même opacité
-    // à toutes les couches : l'effet est plus fantomatique, le fond ressort.
+    //
+    // Les captures y sont empilées comme des calques : la PREMIÈRE au-dessus,
+    // et là où elle n'a rien vu — un trou du maillage, une zone que l'appareil
+    // n'a pas atteinte — celle du dessous apparaît à sa place. Un curseur par
+    // capture règle l'opacité de chacune, dans le panneau.
+    //
+    // 'auto' (recommandé) : les curseurs partent des valeurs qui donnent à
+    // chaque capture le même poids — 1, 1/2, 1/3 du fond vers le dessus, ce qui
+    // fait exactement 1/3 chacune sur trois captures. Poussez-les à fond pour
+    // la pile franche, baissez-en une pour la voir à travers les autres.
+    //
+    // Vous pouvez forcer un nombre (ex. 0.5) : toutes les couches prennent
+    // alors cette opacité et les curseurs ne commandent plus rien. L'effet est
+    // plus fantomatique, le fond ressort.
     opaciteComposite: 'auto',
   },
 };

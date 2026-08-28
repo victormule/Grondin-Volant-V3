@@ -1758,10 +1758,10 @@ body.sur-accueil > *:not(.accueil) { display: none !important; }
    MÉLANGE DES CAPTURES
    ==========================================================================
 
-   Sous l'onglet « Toutes les sessions », et seulement là. Deux boutons pour le
-   mode, un curseur par capture. Le bloc est décalé et souligné d'un filet à
-   gauche : il appartient à l'onglet au-dessus de lui, il n'est pas une section
-   de plus dans le panneau. */
+   Sous l'onglet « Toutes les sessions », et seulement là. Un curseur par
+   capture, et un bouton qui rend à chacune le même poids. Le bloc est décalé et
+   souligné d'un filet à gauche : il appartient à l'onglet au-dessus de lui, il
+   n'est pas une section de plus dans le panneau. */
 
 .melange-sessions {
   display: flex;
@@ -1772,50 +1772,48 @@ body.sur-accueil > *:not(.accueil) { display: none !important; }
   border-left: 1px solid var(--border);
 }
 
-.melange-modes {
+/* La tête du bloc : ce que les curseurs commandent, et un seul bouton — celui
+   qui rend à chaque capture le même poids. Il remplace un sélecteur à deux
+   modes, parce que les parts égales sont un point de départ, pas un état à
+   tenir : on y revient, on ne s'y installe pas. */
+.melange-tete {
   display: flex;
-  gap: 0.25rem;
-  padding: 0.15rem;
-  border: 1px solid var(--border);
-  border-radius: 0.6rem;
-  background: color-mix(in srgb, var(--text) 4%, transparent);
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
-.melange-modes button {
-  flex: 1 1 0;
-  padding: 0.3rem 0.4rem;
-  border: 0;
-  border-radius: 0.45rem;
+.melange-titre {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.melange-egal {
+  flex: none;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 0.74rem;
-  font-weight: 550;
+  font-size: 0.7rem;
   cursor: pointer;
   transition: background 140ms ease, color 140ms ease;
 }
 
-.melange-modes button:hover { color: var(--text); }
-
-.melange-modes button[aria-pressed="true"] {
-  background: var(--panel);
-  box-shadow: 0 0.1rem 0.35rem color-mix(in srgb, var(--text) 10%, transparent);
+.melange-egal:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
   color: var(--text);
 }
 
 .melange-ordre {
-  margin: -0.25rem 0 0;
+  margin: -0.3rem 0 0;
   color: var(--muted);
   font-size: 0.68rem;
-}
-
-/* Les curseurs ne servent qu'à la superposition : en moyenne, chaque capture
-   pèse autant que les autres par construction, et les montrer actifs
-   laisserait croire le contraire. On les estompe plutôt que de les retirer —
-   ils disent ce que le mode d'à côté rendra réglable. */
-.melange-sessions:not(.melange-pile) .melange-champ {
-  opacity: 0.45;
-  pointer-events: none;
+  line-height: 1.35;
 }
 
 .melange-champ .field-label { font-size: 0.72rem; }

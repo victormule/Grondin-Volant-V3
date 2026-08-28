@@ -29,11 +29,25 @@ const _hautMonde = new THREE.Vector3(0, 1, 0);
 // or out would be one conversion too many. A built-in material cannot be
 // talked out of those; four lines of shader can.
 //
-// The layer's weight is a GL blend constant rather than a material opacity, so
-// it scales the image after tone mapping — exactly where CSS used to apply it.
+// EMPILER DES RELEVÉS, PAS DES IMAGES.
+//
+// L'opacité était une constante de mélange GL : dst = k·couche + (1−k)·dst,
+// appliquée à TOUT le cadre. Le trou d'une capture — là où l'appareil n'a rien
+// vu — effaçait donc (1−k) de ce qui était dessous, exactement comme s'il y
+// avait eu de la matière. À pleine opacité la couche du dessus masquait tout,
+// à opacité partagée les trois se fondaient : deux façons d'obtenir la même
+// bouillie, et aucune ne montrait ce qu'une capture avait vu que l'autre
+// n'avait pas.
+//
+// Ici l'opacité multiplie les QUATRE canaux d'une capture en alpha
+// prémultiplié, et le mélange est un « source-over » ordinaire, avec l'alpha de
+// la couche pour facteur. Là où la couche a de la matière, elle recouvre à
+// l'opacité voulue ; là où elle est vide, son alpha est nul et la couche du
+// dessous apparaît intacte. C'est la superposition telle qu'on l'attend d'un
+// calque.
 function creerMateriauQuad() {
   return new THREE.ShaderMaterial({
-    uniforms: { image: { value: null } },
+    uniforms: { image: { value: null }, opacite: { value: 1 } },
     vertexShader: /* glsl */`
       varying vec2 vUv;
       void main() {
@@ -42,19 +56,37 @@ function creerMateriauQuad() {
       }`,
     fragmentShader: /* glsl */`
       uniform sampler2D image;
+      uniform float opacite;
       varying vec2 vUv;
       void main() {
-        gl_FragColor = texture2D(image, vUv);
+        // Le tampon de dessin est en alpha prémultiplié : diluer une couche,
+        // c'est multiplier ses quatre canaux. L'alpha reste le sien, donc le
+        // vide reste du vide.
+        gl_FragColor = texture2D(image, vUv) * opacite;
       }`,
     depthTest: false,
     depthWrite: false,
     blending: THREE.CustomBlending,
     blendEquation: THREE.AddEquation,
-    blendSrc: THREE.ConstantAlphaFactor,
-    blendDst: THREE.OneMinusConstantAlphaFactor,
-    blendSrcAlpha: THREE.ConstantAlphaFactor,
-    blendDstAlpha: THREE.OneMinusConstantAlphaFactor,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneMinusSrcAlphaFactor,
+    blendSrcAlpha: THREE.OneFactor,
+    blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
   });
+}
+
+// LES OPACITÉS QUI DONNENT À CHACUNE LE MÊME POIDS.
+//
+// Posée sur un fond vide, la première couche est opaque ; la deuxième à 1/2
+// laisse voir la première de moitié ; la troisième à 1/3 laisse les deux
+// premières pour deux tiers. Chaque capture pèse alors exactement 1/n de
+// l'image — c'est le mélange à parts égales, obtenu sans mode particulier,
+// seulement par la position des curseurs.
+//
+// L'ordre est celui de la pose : la DERNIÈRE capture au fond, la première
+// au-dessus. Le tableau rendu est indexé comme les sessions.
+export function opacitesEquilibrees(nombre) {
+  return Array.from({ length: nombre }, (_, i) => 1 / (nombre - i));
 }
 
 // Smallest distance at which the eight corners of the bounding box all fall
@@ -96,7 +128,6 @@ export class Scene3D {
     this.mode = 'simple';
     // Comment les captures se mélangent quand elles sont toutes à l'écran, et
     // le poids de chacune. Voir definirMelange.
-    this.melangeComposite = 'moyenne';
     this.poidsComposite = [];
     this._dernierTemps = performance.now();
     this._renduDemande = true;
@@ -368,9 +399,12 @@ export class Scene3D {
     if (this.apresRendu?.(controleChange)) this.demanderRendu();
   }
 
-  // Composite mode stacks the three captures the way the old version did:
-  // three <model-viewer> elements superimposed with CSS opacities 1, 1/2, 1/3,
-  // so that each capture weighs exactly 1/3.
+  // Composite mode stacks the captures the way the old version did: several
+  // <model-viewer> elements superimposed with CSS opacities 1, 1/2, 1/3 …, so
+  // that each capture weighs exactly 1/n. Those are now only the *starting*
+  // slider positions; each layer's opacity is free, and the stack respects each
+  // layer's own alpha, so a hole in one capture shows the one underneath rather
+  // than fading it out.
   //
   // What CSS stacked were three *finished images*. That matters more than it
   // sounds: inside one capture, material_fringe is translucent (d 0.45 in the
@@ -405,67 +439,55 @@ export class Scene3D {
     for (const i of this._ordreCouches()) {
       const materiau = this._materiauxQuad[i];
       materiau.uniforms.image.value = this._captures[i];
-      materiau.blendAlpha = this._opaciteCouche(i);
+      materiau.uniforms.opacite.value = this._opaciteCouche(i);
       this._quad.material = materiau;
       this.renderer.render(this._sceneQuad, this._cameraQuad);
     }
   }
 
-  // DEUX FAÇONS D'EMPILER, UN SEUL JEU DE POIDS.
+  // UN SEUL RÉGLAGE : L'OPACITÉ DE CHAQUE CAPTURE.
   //
-  // « Moyenne » : chaque capture pèse pareil dans l'image finale — c'est le
-  // mode d'origine, celui qui sert à voir ce que trois relevés du même objet
-  // ont en commun et où ils divergent. Les opacités 1, 1/2, 1/3 … donnent
-  // exactement ça : la n-ième posée à 1/n sur la moyenne des précédentes.
+  // Il y avait deux modes, « moyenne » et « superposition ». Ils donnaient la
+  // même image à peu de chose près, et pour cause : tant que le mélange
+  // ignorait l'alpha des couches, aucun des deux ne pouvait montrer autre chose
+  // qu'un fondu du cadre entier. Le mélange le respecte maintenant, et un seul
+  // réglage suffit à parcourir tout ce qui a un sens :
   //
-  // « Superposition » : chaque capture recouvre celle du dessous à l'opacité
-  // qu'on lui donne, la première tout en haut, la dernière tout en bas. C'est
-  // le calque au sens ordinaire — poser le LiDAR sous la photogrammétrie et
-  // baisser celle-ci à 40 % pour voir l'un à travers l'autre.
+  //   · aux valeurs par défaut — 1, 1/2, 1/3 … du fond vers le dessus — chaque
+  //     capture pèse exactement 1/n de l'image : le mélange à parts égales ;
+  //   · tous les curseurs à fond, c'est la pile franche : la première capture
+  //     par-dessus, et là où elle n'a rien vu, celle du dessous apparaît ;
+  //   · entre les deux, on dose.
   //
-  // Les deux lisent le même tableau de poids. Avec des poids tous à un, la
-  // moyenne pondérée redonne 1/(index+1) : le comportement d'avant, au bit près.
-  definirMelange(mode, poids) {
-    this.melangeComposite = mode === 'pile' ? 'pile' : 'moyenne';
+  // Le tableau est indexé comme les sessions. Une case absente laisse la couche
+  // à sa valeur d'équilibre, si bien que le composite est juste avant même que
+  // l'interface n'ait touché un curseur.
+  definirMelange(poids) {
     if (Array.isArray(poids)) this.poidsComposite = poids.slice();
     if (this.mode === 'composite') this.demanderRendu();
   }
 
-  // L'ORDRE DE POSE.
+  // L'ORDRE DE POSE : LA PREMIÈRE CAPTURE AU-DESSUS.
   //
-  // En superposition, c'est la PREMIÈRE capture qu'on regarde — celle dont on
-  // veut le rendu net, les autres servant à la confronter. Elle est donc posée
-  // en dernier, c'est-à-dire au-dessus, et les suivantes s'enfoncent dans la
-  // pile : premier calcul devant, procédé de référence devant.
-  //
-  // En moyenne l'ordre ne change rien au résultat — une moyenne pondérée ne
-  // dépend pas de l'ordre des termes — mais le cumul des opacités, lui, se
-  // calcule dans l'ordre où l'on pose. Les deux lisent donc la même liste.
+  // C'est elle qu'on regarde — la référence, le premier calcul, le procédé
+  // principal — les suivantes servant à la confronter. Elle est donc posée en
+  // dernier, c'est-à-dire par-dessus, et les autres s'enfoncent dans la pile.
   _ordreCouches() {
     const presentes = [];
     for (let i = 0; i < this.couches.length; i += 1) if (this.couches[i]) presentes.push(i);
-    return this.melangeComposite === 'pile' ? presentes.reverse() : presentes;
-  }
-
-  _poidsCouche(index) {
-    const p = this.poidsComposite?.[index];
-    return Number.isFinite(p) ? Math.min(1, Math.max(0, p)) : 1;
+    return presentes.reverse();
   }
 
   _opaciteCouche(index) {
     const forcee = this.config.affichage.opaciteComposite;
     if (typeof forcee === 'number') return forcee;
-    const poids = this._poidsCouche(index);
-    if (this.melangeComposite === 'pile') return poids;
-    // Moyenne pondérée : la couche pèse sa part de tout ce qui est déjà posé.
-    // Les couches absentes ne comptent pas — sinon la première capture chargée
-    // d'un objet à trous serait posée à un demi sur du vide.
-    let cumul = 0;
-    for (const i of this._ordreCouches()) {
-      cumul += this._poidsCouche(i);
-      if (i === index) break;
-    }
-    return cumul > 0 ? poids / cumul : 0;
+    const donnee = this.poidsComposite?.[index];
+    if (Number.isFinite(donnee)) return Math.min(1, Math.max(0, donnee));
+    // Rien de réglé : la valeur d'équilibre, comptée sur les couches RÉELLEMENT
+    // présentes. Une capture encore en cours de chargement ne doit pas peser
+    // dans le partage, sinon la première serait posée à un demi sur du vide.
+    const position = this._ordreCouches().indexOf(index);
+    return position < 0 ? 0 : 1 / (position + 1);
   }
 
   _preparerCaptures() {

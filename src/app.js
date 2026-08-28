@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { config } from './reglages.js';
-import { Scene3D } from './viewer/scene3d.js';
+import { Scene3D, opacitesEquilibrees } from './viewer/scene3d.js';
 import { Eclairage } from './viewer/eclairage.js';
 import { OmbreContact } from './viewer/ombre.js';
 import { chargerModele, appliquerMatiere } from './viewer/modeles.js';
@@ -1963,49 +1963,43 @@ async function chargerSessions() {
 // capture est à l'écran et ces curseurs ne commanderaient rien. Replié le reste
 // du temps, il ne coûte pas une ligne au panneau.
 //
+// UN CURSEUR PAR CAPTURE, ET RIEN D'AUTRE. Il y avait ici un sélecteur à deux
+// modes ; ils donnaient la même image, et les remplacer par leurs seules
+// opacités ne perd rien : les valeurs de départ SONT le mélange à parts égales,
+// et les pousser à fond donne la pile franche. Un bouton ramène aux premières,
+// ce qui vaut mieux qu'un mode : c'est un point de départ, pas un état.
+//
 // Les curseurs suivent l'ordre du manifeste, et cet ordre EST celui de la pile,
 // lue comme on lit la liste : la première ligne est la couche du dessus, la
-// dernière est celle du fond. C'est dit une fois, en petit, sous le sélecteur de
-// mode — le panneau n'a pas à répéter à chaque ligne ce qu'un coup d'œil à la
-// liste apprend.
+// dernière est celle du fond.
 function construireMelange(sessions) {
   const bloc = document.createElement('div');
   bloc.className = 'melange-sessions';
   bloc.hidden = true;
   elements.melange = bloc;
 
-  const poids = sessions.map(() => 1);
-  let mode = 'moyenne';
-  const appliquerMelange = () => scene3d.definirMelange(mode, poids);
+  const equilibre = opacitesEquilibrees(sessions.length);
+  const poids = equilibre.slice();
+  const appliquerMelange = () => scene3d.definirMelange(poids);
+  const curseurs = [];
 
-  const choix = document.createElement('div');
-  choix.className = 'melange-modes';
-  choix.setAttribute('role', 'group');
-  choix.setAttribute('aria-label', 'Mélange des captures');
-  const boutons = [
-    ['moyenne', 'Moyenne', 'Chaque capture pèse autant : ce qu’elles ont en commun ressort, ce qui les sépare se dédouble.'],
-    ['pile', 'Superposition', 'Chaque capture recouvre celle du dessous, à l’opacité que vous lui donnez.'],
-  ].map(([cle, texte, aide]) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = texte;
-    b.title = aide;
-    b.setAttribute('aria-pressed', String(cle === mode));
-    b.addEventListener('click', () => {
-      mode = cle;
-      for (const autre of choix.children) autre.setAttribute('aria-pressed', String(autre === b));
-      bloc.classList.toggle('melange-pile', cle === 'pile');
-      appliquerMelange();
-    });
-    return b;
-  });
-  choix.append(...boutons);
+  const tete = document.createElement('div');
+  tete.className = 'melange-tete';
+  const titre = document.createElement('span');
+  titre.className = 'melange-titre';
+  titre.textContent = 'Opacité de chaque capture';
+  const egaliser = document.createElement('button');
+  egaliser.type = 'button';
+  egaliser.className = 'melange-egal';
+  egaliser.textContent = 'Parts égales';
+  egaliser.title = 'Rendre à chaque capture le même poids dans l’image';
+  tete.append(titre, egaliser);
 
   const ordre = document.createElement('p');
   ordre.className = 'melange-ordre';
-  ordre.textContent = 'En superposition : la première au-dessus, la dernière au fond.';
+  ordre.textContent = 'La première au-dessus. Là où elle n’a rien vu, celle du dessous apparaît.';
 
-  bloc.append(choix, ordre);
+  bloc.append(tete, ordre);
 
   sessions.forEach((session, index) => {
     const champ = document.createElement('div');
@@ -2015,7 +2009,6 @@ function construireMelange(sessions) {
     const nom = document.createElement('label');
     nom.textContent = session.label;
     const valeur = document.createElement('span');
-    valeur.textContent = '100 %';
     etiquette.append(nom, valeur);
 
     const curseur = document.createElement('input');
@@ -2023,10 +2016,20 @@ function construireMelange(sessions) {
     curseur.min = '0';
     curseur.max = '100';
     curseur.step = '5';
-    curseur.value = '100';
     const identifiant = `melange-${index}`;
     curseur.id = identifiant;
     nom.htmlFor = identifiant;
+
+    // Le curseur porte des pourcents entiers ; le poids appliqué reste la
+    // fraction exacte tant qu'on n'y a pas touché. Sans cela, « parts égales »
+    // sur trois captures deviendrait 33 %, et le tiers ne tomberait plus juste.
+    const afficher = (fraction) => {
+      curseur.value = String(Math.round(fraction * 100));
+      valeur.textContent = `${curseur.value} %`;
+    };
+    afficher(equilibre[index]);
+    curseurs.push(afficher);
+
     curseur.addEventListener('input', () => {
       poids[index] = Number(curseur.value) / 100;
       valeur.textContent = `${curseur.value} %`;
@@ -2037,6 +2040,12 @@ function construireMelange(sessions) {
     bloc.appendChild(champ);
   });
 
+  egaliser.addEventListener('click', () => {
+    equilibre.forEach((fraction, i) => { poids[i] = fraction; curseurs[i](fraction); });
+    appliquerMelange();
+  });
+
+  appliquerMelange();
   return bloc;
 }
 
