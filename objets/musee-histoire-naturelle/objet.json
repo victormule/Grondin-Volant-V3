@@ -9,7 +9,7 @@
   "provenance": {
     "export": "sources/Project 2026-08-27 #37_export_2026-08-28T16-44-48Z",
     "commande": "C:\\Users\\Utilisateur\\Desktop\\FRANCOIS\\Francois\\outils\\ingerer.mjs \"sources/Project 2026-08-27 #37_export_2026-08-28T16-44-48Z\" --id musee-histoire-naturelle --nom \"Musée d'histoire naturelle\" --a-plat --maillage \"LiDAR=sources/Project 2026-08-27 #37_export_2026-08-28T17-20-29Z/sessions/DE1EAFF9-052B-49B9-A544-FC9FBD1EF135/scene/sparse_cloud_DE1EAFF9-052B-49B9-A544-FC9FBD1EF135.ply\"",
-    "ingere": "2026-08-28T17:31:04.396Z"
+    "ingere": "2026-08-28T20:31:20.077Z"
   },
   "sessions": [
     {
@@ -38,8 +38,8 @@
     },
     "affichage": {
       "vueInitiale": {
-        "azimut": 0,
-        "elevation": 62,
+        "azimut": 180,
+        "elevation": 22,
         "marge": 1.05
       },
       "aplomb": null,
@@ -55,6 +55,10 @@
           0
         ]
       }
+    },
+    "mesure": {
+      "longueurModeleReference": 1,
+      "longueurReelleReference": 2
     }
   }
 }

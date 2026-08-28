@@ -1160,8 +1160,13 @@ body:has(.panneau-calques.collapsed) .barre-outils {
   -webkit-backdrop-filter: blur(18px) saturate(1.12);
 }
 
+/* SOUS LE BOUTON DE RETOUR, PAS DERRIÈRE LUI.
+   Les deux étaient posés au même endroit — en haut, centrés — et le message
+   passait sous la pastille flottante : « Cliquez un c… pour annuler », dont
+   la moitié manquante était justement ce qu'il fallait lire. Le bandeau
+   descend d'une hauteur de bouton et d'un interligne. */
 .viewer-status {
-  top: 1rem;
+  top: 3.5rem;
   right: auto;
   left: 50%;
   padding: 0.48rem 0.75rem;
@@ -1714,14 +1719,17 @@ body.sur-accueil > *:not(.accueil) { display: none !important; }
 }
 
 .retour-accueil svg {
-  width: 0.82rem;
-  height: 0.82rem;
+  /* Un peu plus grand et un trait plus fin que le chevron d'avant : le
+     pictogramme porte trois formes là où il n'y en avait qu'une, et à cette
+     taille un trait de 1,7 les empâterait l'une dans l'autre. */
+  width: 0.95rem;
+  height: 0.95rem;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.7;
+  stroke-width: 1.35;
   stroke-linecap: round;
   stroke-linejoin: round;
-  /* Le chevron recule d'un cheveu au survol : le geste que le bouton décrit. */
+  /* L'icône recule d'un cheveu au survol : le geste que le bouton décrit. */
   transition: transform 160ms cubic-bezier(0.22, 0.72, 0.2, 1);
 }
 
@@ -1745,3 +1753,70 @@ body.sur-accueil > *:not(.accueil) { display: none !important; }
   }
   .retour-accueil span { display: none; }
 }
+
+/* ==========================================================================
+   MÉLANGE DES CAPTURES
+   ==========================================================================
+
+   Sous l'onglet « Toutes les sessions », et seulement là. Deux boutons pour le
+   mode, un curseur par capture. Le bloc est décalé et souligné d'un filet à
+   gauche : il appartient à l'onglet au-dessus de lui, il n'est pas une section
+   de plus dans le panneau. */
+
+.melange-sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0.15rem 0 0.35rem 0.5rem;
+  padding: 0.6rem 0 0.2rem 0.7rem;
+  border-left: 1px solid var(--border);
+}
+
+.melange-modes {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+
+.melange-modes button {
+  flex: 1 1 0;
+  padding: 0.3rem 0.4rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.melange-modes button:hover { color: var(--text); }
+
+.melange-modes button[aria-pressed="true"] {
+  background: var(--panel);
+  box-shadow: 0 0.1rem 0.35rem color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+}
+
+.melange-ordre {
+  margin: -0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+/* Les curseurs ne servent qu'à la superposition : en moyenne, chaque capture
+   pèse autant que les autres par construction, et les montrer actifs
+   laisserait croire le contraire. On les estompe plutôt que de les retirer —
+   ils disent ce que le mode d'à côté rendra réglable. */
+.melange-sessions:not(.melange-pile) .melange-champ {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.melange-champ .field-label { font-size: 0.72rem; }
+.melange-champ input[type="range"] { width: 100%; accent-color: var(--accent); }

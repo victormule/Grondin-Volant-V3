@@ -57,7 +57,7 @@ function jacobi(A0, n = 4, balayages = 50) {
 
 // La similitude qui amène `source` sur `cible`, les deux listes étant
 // appariées point à point. Horn 1987.
-export function similitude(source, cible) {
+export function similitude(source, cible, rigide = false) {
   const n = source.length;
   const mp = [0, 0, 0]; const mq = [0, 0, 0];
   for (let i = 0; i < n; i += 1) {
@@ -94,7 +94,15 @@ export function similitude(source, cible) {
     const p = appliquer(R, [source[i][0] - mp[0], source[i][1] - mp[1], source[i][2] - mp[2]]);
     projection += p[0] * (cible[i][0] - mq[0]) + p[1] * (cible[i][1] - mq[1]) + p[2] * (cible[i][2] - mq[2]);
   }
-  const c = normeSource > 0 ? projection / normeSource : 1;
+  // RIGIDE : ROTATION ET TRANSLATION, SANS ÉCHELLE.
+  //
+  // Une similitude est libre de rétrécir la source pour réduire le résidu, et
+  // elle ne s en prive pas : recalant le nuage LiDAR sur la photogrammétrie,
+  // elle gagnait huit millimètres de RMSE en comprimant le relevé de 8,5 %.
+  // Or le mètre ruban dit que l échelle est juste — ce gain payait un rapport
+  // de longueurs faux. Quand deux relevés sont déjà à la même échelle, seules
+  // la rotation et la translation sont à trouver, et l échelle reste à un.
+  const c = rigide ? 1 : (normeSource > 0 ? projection / normeSource : 1);
   const Rp = appliquer(R, mp);
   return depuisQuaternion(q, c, [mq[0] - c * Rp[0], mq[1] - c * Rp[1], mq[2] - c * Rp[2]]);
 }
@@ -116,6 +124,7 @@ export function recaler(sourceComplete, cibleComplete, depart, options = {}) {
     echantillon = 4000,
     quantileConserve = 0.7,
     convergence = 1e-6,
+    rigide = false,
   } = options;
 
   const source = echantillonner(sourceComplete, echantillon);
@@ -138,7 +147,7 @@ export function recaler(sourceComplete, cibleComplete, depart, options = {}) {
 
     // La similitude est estimée sur les points DÉJÀ transformés, puis composée
     // avec M : on cherche la correction, pas la transformation complète.
-    const correction = similitude(garde.map((p) => transformes[p.i]), garde.map((p) => p.cible));
+    const correction = similitude(garde.map((p) => transformes[p.i]), garde.map((p) => p.cible), rigide);
     M = multiplier4(correction, M);
 
     const precedent = rmse;

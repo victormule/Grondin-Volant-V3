@@ -1835,9 +1835,13 @@ async function obtenirCouche(session, index) {
 }
 
 function marquerOnglet(bouton) {
-  for (const onglet of elements.listeSessions.querySelectorAll('.session-tab')) {
+  const onglets = [...elements.listeSessions.querySelectorAll('.session-tab')];
+  for (const onglet of onglets) {
     onglet.setAttribute('aria-pressed', String(onglet === bouton));
   }
+  // Le réglage du mélange n'a de sens que sous le dernier onglet, celui qui
+  // met toutes les captures à l'écran. Ailleurs il commanderait le vide.
+  if (elements.melange) elements.melange.hidden = bouton !== onglets.at(-1);
 }
 
 let revisionVue = 0;
@@ -1949,7 +1953,90 @@ async function chargerSessions() {
     bouton.innerHTML = `Toutes les sessions<span>Superposition des ${sessions.length} captures</span>`;
     bouton.addEventListener('click', () => choisirComposite(sessions, bouton));
     elements.listeSessions.appendChild(bouton);
+    elements.listeSessions.appendChild(construireMelange(sessions));
   }
+}
+
+// LE RÉGLAGE DU MÉLANGE, ET SEULEMENT QUAND IL SERT.
+//
+// Il ne s'ouvre que sous l'onglet « Toutes les sessions » : ailleurs, une seule
+// capture est à l'écran et ces curseurs ne commanderaient rien. Replié le reste
+// du temps, il ne coûte pas une ligne au panneau.
+//
+// Les curseurs suivent l'ordre du manifeste, qui est aussi l'ordre d'empilement
+// — la première dessous, la dernière dessus. C'est dit une fois, en petit, sous
+// le sélecteur de mode : le panneau n'a pas à répéter à chaque ligne ce qu'un
+// coup d'œil à la liste apprend.
+function construireMelange(sessions) {
+  const bloc = document.createElement('div');
+  bloc.className = 'melange-sessions';
+  bloc.hidden = true;
+  elements.melange = bloc;
+
+  const poids = sessions.map(() => 1);
+  let mode = 'moyenne';
+  const appliquerMelange = () => scene3d.definirMelange(mode, poids);
+
+  const choix = document.createElement('div');
+  choix.className = 'melange-modes';
+  choix.setAttribute('role', 'group');
+  choix.setAttribute('aria-label', 'Mélange des captures');
+  const boutons = [
+    ['moyenne', 'Moyenne', 'Chaque capture pèse autant : ce qu’elles ont en commun ressort, ce qui les sépare se dédouble.'],
+    ['pile', 'Superposition', 'Chaque capture recouvre celle du dessous, à l’opacité que vous lui donnez.'],
+  ].map(([cle, texte, aide]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = texte;
+    b.title = aide;
+    b.setAttribute('aria-pressed', String(cle === mode));
+    b.addEventListener('click', () => {
+      mode = cle;
+      for (const autre of choix.children) autre.setAttribute('aria-pressed', String(autre === b));
+      bloc.classList.toggle('melange-pile', cle === 'pile');
+      appliquerMelange();
+    });
+    return b;
+  });
+  choix.append(...boutons);
+
+  const ordre = document.createElement('p');
+  ordre.className = 'melange-ordre';
+  ordre.textContent = 'La première dessous, la dernière dessus.';
+
+  bloc.append(choix, ordre);
+
+  sessions.forEach((session, index) => {
+    const champ = document.createElement('div');
+    champ.className = 'field melange-champ';
+    const etiquette = document.createElement('span');
+    etiquette.className = 'field-label';
+    const nom = document.createElement('label');
+    nom.textContent = session.label;
+    const valeur = document.createElement('span');
+    valeur.textContent = '100 %';
+    etiquette.append(nom, valeur);
+
+    const curseur = document.createElement('input');
+    curseur.type = 'range';
+    curseur.min = '0';
+    curseur.max = '100';
+    curseur.step = '5';
+    curseur.value = '100';
+    const identifiant = `melange-${index}`;
+    curseur.id = identifiant;
+    nom.htmlFor = identifiant;
+    curseur.addEventListener('input', () => {
+      poids[index] = Number(curseur.value) / 100;
+      valeur.textContent = `${curseur.value} %`;
+      appliquerMelange();
+    });
+
+    champ.append(etiquette, curseur);
+    bloc.appendChild(champ);
+  });
+
+  return bloc;
 }
 
 chargerRecalage();

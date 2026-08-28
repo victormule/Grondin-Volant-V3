@@ -385,11 +385,71 @@ for (const m of maillages) {
     process.exit(1);
   }
   const cle = m.etiquette.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const versObjet = multiplier(pose.M, inverse(ref.alignement.transformMatrix.map(Number)));
+  const versRef = inverse(ref.alignement.transformMatrix.map(Number));
   console.log('');
 
-  if (m.chemin.toLowerCase().endsWith('.ply')) {
-    // UN LIDAR SE MONTRE EN POINTS.
+  const estNuage = m.chemin.toLowerCase().endsWith('.ply');
+  const donnees = estNuage
+    ? await lireNuagePLY(m.chemin, { voxel: voxelNuage })
+    : lireNuageOBJ(m.chemin);
+
+  // LA MATRICE D'ARKit PLACE ; ELLE N'AJUSTE PAS.
+  //
+  // Elle vient de la carte du monde : elle sait où la photogrammétrie se tient
+  // dans la session AR, à la justesse de cette carte près — huit centimètres
+  // d'erreur moyenne annoncés dans le fichier. D'où le léger décalage visible
+  // en passant d'un procédé à l'autre : deux relevés du même objet qui ne se
+  // superposent pas tout à fait.
+  //
+  // On la raffine donc par ICP, comme on le fait déjà entre deux captures. Deux
+  // précautions : le recalage ne se calcule QUE sur la zone commune — le LiDAR
+  // voit dix mètres de salle là où la photogrammétrie en couvre deux et demi,
+  // et les points qui ne regardent rien tireraient l'ajustement n'importe où —
+  // et il n'est retenu que s'il améliore réellement le résidu. Un raffinement
+  // qui dégrade est un raffinement qu'on jette.
+  // Les residus se lisent mieux en millimetres reels qu en unites de modele.
+  const echelleReelle = ref.alignement.scale ?? 1;
+  const bref = boite(ref.nuage.positions);
+  const marge = bref.diagonale * 0.08;
+  const dansRef = [];
+  const source = estNuage ? donnees.positions : null;
+  const nbPoints = estNuage ? donnees.gardes : donnees.positions.length;
+  for (let i = 0; i < nbPoints; i += 1) {
+    const brut = estNuage
+      ? [source[i * 3], source[i * 3 + 1], source[i * 3 + 2]]
+      : donnees.positions[i];
+    const p = appliquer(versRef, brut);
+    if (p[0] < bref.mn[0] - marge || p[0] > bref.mx[0] + marge) continue;
+    if (p[1] < bref.mn[1] - marge || p[1] > bref.mx[1] + marge) continue;
+    if (p[2] < bref.mn[2] - marge || p[2] > bref.mx[2] + marge) continue;
+    dansRef.push(p);
+  }
+
+  let correction = IDENTITE;
+  if (dansRef.length < 500) {
+    console.log(`« ${m.etiquette} » : ${dansRef.length} points dans l’emprise de la référence — `
+      + 'trop peu pour raffiner, matrice ARKit conservée');
+  } else {
+    const avant = jugerRecalage({ positions: dansRef }, ref.nuage, IDENTITE);
+    // Rigide : les deux relevés sont déjà à la même échelle (la matrice ARKit
+    // s en est chargée), il ne reste qu une rotation et une translation à
+    // corriger. Laisser l échelle libre revenait à comprimer le LiDAR de 8,5 %
+    // pour gagner huit millimètres — un mensonge métrique payé d un chiffre.
+    const essai = recaler(dansRef, ref.nuage.positions, IDENTITE, { rigide: true });
+    const apres = jugerRecalage({ positions: dansRef }, ref.nuage, essai.M);
+    const mieux = apres.rmse < avant.rmse;
+    if (mieux) correction = essai.M;
+    const mm = (x) => (x * 1000 * echelleReelle).toFixed(0);
+    console.log(`« ${m.etiquette} » : recalage sur ${dansRef.length} points de la zone commune`);
+    console.log(`  écart à la photogrammétrie : ${mm(avant.rmse)} mm → ${mm(apres.rmse)} mm`
+      + `  (médiane ${mm(avant.mediane)} → ${mm(apres.mediane)}, échelle ×${echelleDe(essai.M).toFixed(4)})`);
+    if (!mieux) console.log('  le raffinement n’améliore rien : matrice ARKit conservée');
+  }
+  const versObjet = multiplier(pose.M, multiplier(correction, versRef));
+
+  if (estNuage) {
+    const nuage = donnees;
+    // UN LIDAR SE MONTRE EN POINTS. (lecture faite plus haut)
     //
     // ARKit livre aussi une surface reconstruite, et elle est trompeuse : elle
     // lisse, elle bouche, elle donne à voir du plein là où l'appareil n'a mesuré
@@ -399,7 +459,6 @@ for (const m of maillages) {
     // Et on ne le recadre pas : le sol est une donnée. Sur un maillage de
     // comparaison, découper au gabarit de la photogrammétrie a du sens ; ici la
     // salle entière est ce que le relevé a relevé.
-    const nuage = await lireNuagePLY(m.chemin, { voxel: voxelNuage });
     publiees.push({
       externe: true,
       nuagePoints: nuage,
@@ -415,18 +474,17 @@ for (const m of maillages) {
     continue;
   }
 
-  const nuage = lireNuageOBJ(m.chemin);
   publiees.push({
     externe: true,
     etiquette: m.etiquette,
     cle,
     obj: m.chemin,
     textures: {},
-    sommets: nuage.positions.length,
+    sommets: donnees.positions.length,
     debut: ref.debut,
     Mfinal: versObjet,
   });
-  console.log(`maillage « ${m.etiquette} » : ${nuage.positions.length} sommets, `
+  console.log(`maillage « ${m.etiquette} » : ${donnees.positions.length} sommets, `
     + 'placé par la matrice d’alignement ARKit de la référence');
 }
 

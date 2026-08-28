@@ -94,6 +94,10 @@ export class Scene3D {
     this.conteneur = conteneur;
     this.couches = [];
     this.mode = 'simple';
+    // Comment les captures se mélangent quand elles sont toutes à l'écran, et
+    // le poids de chacune. Voir definirMelange.
+    this.melangeComposite = 'moyenne';
+    this.poidsComposite = [];
     this._dernierTemps = performance.now();
     this._renduDemande = true;
 
@@ -408,13 +412,42 @@ export class Scene3D {
     });
   }
 
-  // Opacities 1, 1/2, 1/3 … 1/n give every capture the same weight. A single
-  // opacity for every layer would let the background bleed through and wash
-  // the colours out instead.
+  // DEUX FAÇONS D'EMPILER, UN SEUL JEU DE POIDS.
+  //
+  // « Moyenne » : chaque capture pèse pareil dans l'image finale — c'est le
+  // mode d'origine, celui qui sert à voir ce que trois relevés du même objet
+  // ont en commun et où ils divergent. Les opacités 1, 1/2, 1/3 … donnent
+  // exactement ça : la n-ième posée à 1/n sur la moyenne des précédentes.
+  //
+  // « Superposition » : chaque capture recouvre celle du dessous à l'opacité
+  // qu'on lui donne, la première tout en bas, la dernière tout en haut. C'est
+  // le calque au sens ordinaire — poser le LiDAR à 40 % sur la photogrammétrie
+  // pour voir l'un à travers l'autre.
+  //
+  // Les deux lisent le même tableau de poids. Avec des poids tous à un, la
+  // moyenne pondérée redonne 1/(index+1) : le comportement d'avant, au bit près.
+  definirMelange(mode, poids) {
+    this.melangeComposite = mode === 'pile' ? 'pile' : 'moyenne';
+    if (Array.isArray(poids)) this.poidsComposite = poids.slice();
+    if (this.mode === 'composite') this.demanderRendu();
+  }
+
+  _poidsCouche(index) {
+    const p = this.poidsComposite?.[index];
+    return Number.isFinite(p) ? Math.min(1, Math.max(0, p)) : 1;
+  }
+
   _opaciteCouche(index) {
     const forcee = this.config.affichage.opaciteComposite;
     if (typeof forcee === 'number') return forcee;
-    return 1 / (index + 1);
+    const poids = this._poidsCouche(index);
+    if (this.melangeComposite === 'pile') return poids;
+    // Moyenne pondérée : la couche pèse sa part de tout ce qui est déjà posé.
+    // Les couches absentes ne comptent pas — sinon la première capture chargée
+    // d'un objet à trous serait posée à un demi sur du vide.
+    let cumul = 0;
+    for (let i = 0; i <= index; i += 1) if (this.couches[i]) cumul += this._poidsCouche(i);
+    return cumul > 0 ? poids / cumul : 0;
   }
 
   _preparerCaptures() {
