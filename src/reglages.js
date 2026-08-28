@@ -43,8 +43,20 @@ const defauts = {
   },
   mesure: {
     mode: 'droite',
-    longueurModeleReference: 0.59,
-    longueurReelleReference: 0.19,
+    // PAS D'ÉCHELLE PAR DÉFAUT, ET C'EST VOULU.
+    //
+    // Il y en avait une : 59 cm du modèle pour 19 cm réels, la calibration du
+    // poisson, écrite ici du temps où le site ne servait que lui. Le jour où le
+    // catalogue s'est ouvert, elle s'est appliquée en silence aux quatre cadres
+    // — qui ne déclaraient rien — et l'application affichait « 19,0 cm réels
+    // pour 59,0 cm du modèle » sur un tableau de deux mètres quatre-vingts.
+    // Le vérificateur les disait « NON CALIBRÉ », la fiche du projet les disait
+    // calibrés : c'est la fiche qui mentait, et elle mentait avec l'aplomb d'un
+    // chiffre.
+    //
+    // Une longueur de référence ne peut venir que de l'objet lui-même. Absente,
+    // ECHELLE_MESURE vaut 1, les chiffres restent en unités du modèle, et la
+    // fiche l'annonce. Un objet se calibre dans son objet.json.
     resolution: 1024,
     eviterCoutures: true,
     epaisseur: 2,

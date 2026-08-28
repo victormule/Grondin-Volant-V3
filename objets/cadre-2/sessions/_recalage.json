@@ -1,12 +1,21 @@
 {
-  "reference": "48F31E95-A0F2-4679-B10C-54736F8BDD4C",
+  "reference": "48F31E95-A0F2-4679-B10C-54736F8BDD4C-AA96D4B3",
   "note": "Résidu du recalage de chaque capture sur la capture de référence. Le RMSE est mesuré sur le recouvrement géométrique : les points dont le plus proche voisin dépasse trois espacements de maillage regardent une surface que l’autre capture n’a pas vue et n’ont rien à dire sur l’alignement. « recouvrement » est la part de points retenus. Unités du modèle.",
-  "espacementMaillage": 0.010540295650684133,
-  "9E5790DA-2D4C-4C29-81FF-FC9FCA8F2192": {
-    "rmse": 0.01778215006371728,
-    "recouvrement": 0.6254747297692083,
-    "mediane": 0.022960100101420754,
-    "p90": 0.07415109176091281,
-    "voie": "mesuré sur les .glb servis"
+  "espacementMaillage": 0.010786836095214546,
+  "48F31E95-A0F2-4679-B10C-54736F8BDD4C-F4DFE0B5": {
+    "rmse": 0.009112767929556889,
+    "recouvrement": 0.9871724890829694,
+    "mediane": 0.006112334115775932,
+    "p90": 0.014896654508578334,
+    "echelle": 1.0167410803621704,
+    "voie": "matrice dür.air + ICP point-à-plan"
+  },
+  "48F31E95-A0F2-4679-B10C-54736F8BDD4C-01288A78": {
+    "rmse": 0.011219777012766118,
+    "recouvrement": 0.7685492801771872,
+    "mediane": 0.008815290445928128,
+    "p90": 0.06913242324966516,
+    "echelle": 1.3545007850847641,
+    "voie": "matrice dür.air + ICP point-à-plan"
   }
 }

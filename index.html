@@ -6,7 +6,7 @@
   <meta name="description" content="Visualisation interactive de sessions de photogrammétrie 3D.">
   <!-- Remplacé au démarrage par le nom de l’objet ouvert (voir src/amorce.js) :
        le catalogue en sert plusieurs, et l’onglet doit dire lequel. -->
-  <title>Visualisation 3D</title>
+  <title>Art’Scanner</title>
 
   <!-- Sans cette ligne le navigateur réclame /favicon.ico et journalise une
        erreur 404 à chaque chargement. Remplacez la valeur par le chemin d'une
@@ -2113,6 +2113,18 @@
   <p class="viewer-status" id="viewerStatus" role="status"></p>
   <p class="hint" id="hint">Clic gauche : rotation · clic droit : déplacement · molette : zoom</p>
 
+  <!-- Le retour au catalogue. Il flotte au-dessus de la vue, au centre, plutôt
+       que de vivre dans le panneau de gauche : changer d'objet n'est pas un
+       réglage de la scène, c'est en sortir. Et il reste atteignable quand les
+       deux panneaux sont repliés, ce qui est justement le moment où l'on ne
+       voit plus rien d'autre. -->
+  <a class="retour-accueil" id="retourAccueil" href="./" title="Revenir au choix des objets">
+    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path d="M9.75 3.75 5.5 8l4.25 4.25" />
+    </svg>
+    <span>Tous les objets</span>
+  </a>
+
   <button class="panel-toggle panel-open" id="panelToggle" type="button" aria-expanded="true" aria-controls="panel" title="Replier le panneau">
     <span id="panelToggleIcon" aria-hidden="true">◀</span>
     <span class="visually-hidden" id="panelToggleLabel">Replier le panneau</span>
@@ -2142,11 +2154,6 @@
     <!-- Le catalogue au-dessus des captures : quel objet, puis quelle prise
          de vue de cet objet. La section se retire d'elle-même quand le
          catalogue n'en compte qu'un. -->
-    <div class="group panel-section" data-section="objets" hidden>
-      <span class="group-title">Objets</span>
-      <div class="session-list" id="objetList"></div>
-    </div>
-
     <div class="group panel-section" data-section="sessions">
       <span class="group-title">Captures</span>
       <div class="session-list" id="sessionList"></div>
@@ -2317,6 +2324,11 @@
   <!-- La fiche du projet s'ouvre par-dessus la vue : la remplir est un mode à
        part, où l'on cesse de regarder le spécimen pour regarder le dossier. -->
   <div class="projet-voile" id="projetVoile" hidden></div>
+
+  <!-- Le catalogue en vignettes, montré quand l'URL ne désigne aucun objet.
+       Il reste vide et masqué le reste du temps : c'est amorce.js qui décide,
+       avant même d'importer l'application. -->
+  <main class="accueil" id="accueil" hidden></main>
 
   <!-- L’amorce résout l’objet demandé, charge son manifeste, puis importe
        l’application : les réglages doivent être en place AVANT que app.js ne

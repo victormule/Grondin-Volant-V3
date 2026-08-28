@@ -50,6 +50,22 @@ tools_clean_fins.py
 # même, et le site déployé renverrait 404 sur leurs manifestes.
 /Cadre*/
 
+# Et leurs archives, telles qu elles arrivent du telephone. Un export zippe
+# pese entre 70 et 80 Mo ; deux d entre eux suffisaient a faire entrer 153 Mo
+# de binaires dans l historique, definitivement, pour une matiere premiere
+# deja depliee a cote et deja hors depot. La regle au-dessus ne les attrapait
+# pas : elle se termine par une barre oblique, donc elle ne vise que des
+# dossiers.
+/Cadre*.zip
+
+# Les exports suivants arrivent dans sources/, plutot qu en dossiers eparpilles
+# a la racine. Meme raison : ce sont des OBJ, des PLY et des textures que le
+# navigateur ne demande jamais, et qu un depot Git garderait pour toujours.
+# L archive « Musee histoire naturelle.zip » pese 78 Mo et 264 Mo une fois
+# depliee, dont un nuage de 3,4 millions de points en ASCII.
+/sources/
+/*.zip
+
 # ---------------------------------------------------------------------------
 # CE QUI EST PUBLIÉ
 #
@@ -84,3 +100,6 @@ objets/*/annotations/annotations.non-publie.json
 
 # Message de commit, jetable.
 .commit-msg.txt
+
+# Aperçus rendus hors ligne pour vérifier orientation et sens : outillage, pas site.
+apercus/

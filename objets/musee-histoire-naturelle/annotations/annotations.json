@@ -1,0 +1,11 @@
+{
+  "version": 3,
+  "repere": "musee-histoire-naturelle/oc-redresse-2026-08",
+  "sessionReference": "DE1EAFF9-052B-49B9-A544-FC9FBD1EF135",
+  "racine": {
+    "id": "racine",
+    "type": "groupe",
+    "enfants": []
+  },
+  "medias": []
+}

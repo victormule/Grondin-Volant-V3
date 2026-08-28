@@ -7,7 +7,6 @@ import { Eclairage } from './viewer/eclairage.js';
 import { OmbreContact } from './viewer/ombre.js';
 import { chargerModele, appliquerMatiere } from './viewer/modeles.js';
 import { installerPanneau, exclusiviteMobile } from './ui/panneaux.js';
-import { installerListeObjets } from './ui/liste-objets.js';
 import {
   DocumentAnnotation, creerCalque, creerEpingle, calquePorte, genreElement, identifiant,
   ficheRenseignee, projetRenseigne, VERSION,
@@ -1238,10 +1237,17 @@ function majSpecimen() {
   // specimen or inherited from the capture device.
   const provenance = document.createElement('p');
   provenance.className = 'reglages-note';
-  const reference = `${formaterLongueur(Number(config.mesure.longueurModeleReference))} `
-    + `dans le modèle pour ${formaterLongueur(Number(config.mesure.longueurReelleReference))} réels`;
+  // Un objet non calibré n'a pas d'échelle à montrer. Formater son absence
+  // donnait « NaN m dans le modèle pour NaN m réels » — la seule chose pire
+  // qu'un chiffre faux étant un chiffre qui n'en est pas un.
+  const echelleDeclaree = Number.isFinite(ECHELLE_MESURE) && ECHELLE_MESURE !== 1
+    ? `Échelle : ${formaterLongueur(Number(config.mesure.longueurModeleReference))} `
+      + `dans le modèle pour ${formaterLongueur(Number(config.mesure.longueurReelleReference))} réels. `
+      + 'Toutes les valeurs de l’application en découlent.'
+    : 'Échelle non calibrée : les valeurs ci-dessus sont en unités du modèle, '
+      + 'qui ne sont pas des mètres.';
   const residu = residuRecalage();
-  provenance.textContent = `Échelle : ${reference}. Toutes les valeurs de l’application en découlent.`
+  provenance.textContent = echelleDeclaree
     + (residu ? ` Captures recalées à ${formaterLongueur(residu, k)} près (RMSE).` : '');
   bloc.appendChild(provenance);
 }
@@ -1946,7 +1952,6 @@ async function chargerSessions() {
   }
 }
 
-installerListeObjets($('#objetList'));
 chargerRecalage();
 chargerSessions();
 

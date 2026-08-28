@@ -1,7 +1,16 @@
 {
   "nom": "Cadre 4",
-  "repere": "cadre-4/oc-2026-08",
+  "repere": "cadre-4/oc-redresse-2026-08",
   "recalage": "sessions/_recalage.json",
+  "redressement": {
+    "rotationFace": 0,
+    "aPlat": false
+  },
+  "provenance": {
+    "export": "Cadre 4/Project 2026-08-26 #34_export_2026-08-26T18-41-02Z",
+    "commande": "C:\\Users\\Utilisateur\\Desktop\\FRANCOIS\\Francois\\outils\\ingerer.mjs \"Cadre 4/Project 2026-08-26 #34_export_2026-08-26T18-41-02Z\" --id cadre-4 --nom \"Cadre 4\"",
+    "ingere": "2026-08-26T21:54:42.764Z"
+  },
   "sessions": [
     {
       "id": "64EC6356-C487-43B9-8E2D-A40367C9B5E6",
@@ -13,24 +22,24 @@
   ],
   "reglages": {
     "camera": {
-      "distanceMin": 0.18,
-      "distanceMax": 8.7
+      "distanceMin": 0.16,
+      "distanceMax": 7.6
     },
     "peinture": {
-      "taille": 33,
-      "tailleGomme": 39
+      "taille": 28,
+      "tailleGomme": 34
     },
     "affichage": {
       "vueInitiale": {
         "azimut": 0,
-        "elevation": 20,
-        "marge": 1
+        "elevation": 0,
+        "marge": 1.02
       },
       "aplomb": null,
       "axeRotation": {
         "point": [
           0,
-          -2.980232e-8,
+          0,
           0
         ],
         "direction": [
@@ -39,6 +48,10 @@
           0
         ]
       }
+    },
+    "mesure": {
+      "longueurModeleReference": 0.5955895,
+      "longueurReelleReference": 1.1
     }
   }
 }

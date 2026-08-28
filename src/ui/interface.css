@@ -1514,3 +1514,234 @@ body:has(.panneau-calques.collapsed) .barre-outils {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* ==========================================================================
+   PAGE D'ACCUEIL — le catalogue en vignettes
+   ==========================================================================
+
+   Elle occupe toute la fenêtre et masque le visualiseur, qui n'est de toute
+   façon pas chargé quand elle s'affiche : amorce.js n'importe app.js qu'une
+   fois un objet choisi. Les règles ci-dessous ne servent donc qu'à cacher le
+   décor du visualiseur, présent dans le HTML mais inerte. */
+
+.accueil {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow-y: auto;
+  padding: clamp(2rem, 7vh, 5rem) clamp(1.25rem, 5vw, 4rem);
+  background: var(--background);
+}
+
+/* Le visualiseur est écrit dans la page mais n'a rien à y faire tant qu'on
+   choisit : on le retire de l'affichage plutôt que de le superposer. */
+body.sur-accueil > *:not(.accueil) { display: none !important; }
+
+/* L'en-tête est centré là où le reste du site aligne à gauche : c'est la seule
+   page qui n'a rien au-dessus d'elle, et une identité posée au milieu d'une
+   grille elle-même centrée se lit comme une page de titre plutôt que comme un
+   panneau de réglages. */
+.accueil-entete {
+  max-width: 60rem;
+  margin: 0 auto clamp(1.75rem, 4.5vh, 2.75rem);
+  text-align: center;
+}
+
+.accueil-titre {
+  margin: 0 0 0.55rem;
+  font-size: clamp(2.1rem, 6vw, 3.15rem);
+  font-weight: 600;
+  /* Serré : à cette taille l'approche par défaut fait flotter les lettres. */
+  letter-spacing: -0.028em;
+  line-height: 1.05;
+}
+
+.accueil-signature {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(0.86rem, 1.6vw, 0.98rem);
+  font-weight: 450;
+  letter-spacing: 0.004em;
+}
+
+.accueil-point {
+  margin: 0 0.12rem;
+  opacity: 0.55;
+}
+
+/* Le lien vers le portfolio. Souligné, parce qu'un lien qui ne se distingue
+   que par sa couleur n'est pas un lien pour qui ne voit pas cette couleur ;
+   le trait est écarté du texte et fin, pour rester discret. */
+.accueil-auteur {
+  color: var(--text);
+  font-weight: 550;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, var(--text) 32%, transparent);
+  text-underline-offset: 0.22em;
+  transition: color 160ms ease, text-decoration-color 160ms ease;
+}
+
+.accueil-auteur:hover,
+.accueil-auteur:focus-visible {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+
+/* Le filet entre l'identité du site et son catalogue. */
+.accueil-bandeau {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+  max-width: 60rem;
+  margin: 0 auto clamp(0.9rem, 2.5vh, 1.35rem);
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.accueil-invite {
+  margin: 0;
+}
+
+.accueil-compte {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+/* Sous cette largeur les deux bouts du bandeau se disputent la ligne : le
+   compte passe dessous plutôt que de se couper en deux. */
+@media (max-width: 30rem) {
+  .accueil-bandeau {
+    flex-direction: column;
+    gap: 0.3rem;
+    align-items: flex-start;
+  }
+
+  .accueil-compte { text-align: left; }
+}
+
+.accueil-grille {
+  display: grid;
+  gap: clamp(1rem, 2.5vw, 1.75rem);
+  /* Des cartes qui se rangent d'elles-mêmes : trois de front sur un écran
+     large, une sur un téléphone, sans point de rupture à écrire. */
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  max-width: 60rem;
+  margin: 0 auto;
+}
+
+.accueil-carte {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.65rem 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  background: var(--panel);
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.accueil-carte:hover,
+.accueil-carte:focus-visible {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: 0 0.6rem 1.6rem color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+.accueil-vignette {
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+  border-radius: 0.55rem;
+  /* Un rapport fixe : les vignettes sont carrées, et une hauteur imposée évite
+     que la grille ne se réarrange pendant leur chargement. */
+  aspect-ratio: 1;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.accueil-vignette img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.accueil-nom {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.accueil-detail {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+/* ==========================================================================
+   RETOUR AU CATALOGUE
+   ==========================================================================
+
+   Flottant, au centre haut, indépendant des deux panneaux. Il reprend la même
+   matière que la bascule de panneau et la barre d'outils — fond translucide,
+   flou d'arrière-plan, ombre portée douce — pour qu'on le lise comme un
+   contrôle de la fenêtre et non comme un élément de la scène. */
+
+.retour-accueil {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  z-index: 5;
+  display: inline-flex;
+  gap: 0.42rem;
+  align-items: center;
+  padding: 0.44rem 0.82rem 0.44rem 0.62rem;
+  border: 1px solid var(--border);
+  border-radius: 0.78rem;
+  background: var(--panel);
+  box-shadow: var(--ombre-flottante);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 550;
+  letter-spacing: 0.005em;
+  text-decoration: none;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.retour-accueil svg {
+  width: 0.82rem;
+  height: 0.82rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* Le chevron recule d'un cheveu au survol : le geste que le bouton décrit. */
+  transition: transform 160ms cubic-bezier(0.22, 0.72, 0.2, 1);
+}
+
+.retour-accueil:hover,
+.retour-accueil:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  color: var(--text);
+}
+
+.retour-accueil:hover svg,
+.retour-accueil:focus-visible svg { transform: translateX(-0.12rem); }
+
+.retour-accueil:active { transform: translateX(-50%) translateY(1px); }
+
+/* Sur un écran étroit les deux bascules de panneau se rapprochent du centre :
+   le libellé s'efface et le chevron seul tient la place. */
+@media (max-width: 34rem) {
+  .retour-accueil {
+    padding: 0.44rem;
+    border-radius: 0.7rem;
+  }
+  .retour-accueil span { display: none; }
+}

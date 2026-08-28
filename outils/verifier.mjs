@@ -20,7 +20,7 @@ const SEP = String.fromCharCode(92);
 const racine = process.cwd();
 const types = {
   '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json',
-  '.css': 'text/css', '.glb': 'model/gltf-binary',
+  '.css': 'text/css', '.glb': 'model/gltf-binary', '.jpg': 'image/jpeg', '.png': 'image/png',
 };
 
 const serveur = http.createServer((req, res) => {
@@ -62,6 +62,9 @@ for (const entree of catalogue) {
   chemins.push(`/${dossier}/objet.json`);
   const m = JSON.parse(fs.readFileSync(`${dossier}/objet.json`, 'utf8'));
   chemins.push(`/${dossier}/annotations/annotations.json`);
+  // La page d accueil sert ces vignettes : une manquante, et le catalogue montre
+  // une carte trouee.
+  chemins.push(`/${dossier}/vignette.jpg`);
   if (m.recalage) chemins.push(`/${dossier}/${m.recalage}`);
   for (const s of m.sessions ?? []) chemins.push(`/${dossier}/${s.glb}`);
 
@@ -69,7 +72,16 @@ for (const entree of catalogue) {
   // chargement, en silence pour qui n'ouvre pas la console. Autant le dire ici.
   let doc = null;
   try { doc = JSON.parse(fs.readFileSync(`${dossier}/annotations/annotations.json`, 'utf8')); } catch { /* absent */ }
-  const calques = doc?.racine?.enfants?.length ?? 0;
+  // Compter les enfants de la racine ne comptait que les groupes de premier
+  // niveau : le dossier de démonstration du grondin, ses vingt-sept calques
+  // rangés dans quatre groupes, s'annonçait « 4 calque(s) ». Un outil de
+  // vérification qui arrondit à la baisse ce qu'il est chargé de vérifier ne
+  // sert à rien. On descend l'arbre.
+  const denombrer = (noeud) => (noeud?.enfants ?? []).reduce(
+    (n, enfant) => n + (enfant.type === 'groupe' ? 0 : 1) + denombrer(enfant),
+    0,
+  );
+  const calques = denombrer(doc?.racine);
   const repereOK = calques === 0 || doc?.repere === m.repere;
   resumes.push({
     id: entree.id,
@@ -77,6 +89,17 @@ for (const entree of catalogue) {
     echelle: m.reglages?.mesure?.longueurReelleReference ? 'calibré' : 'NON CALIBRÉ',
     calques,
     repereOK,
+    // LA PHRASE QUE LIT LE VISITEUR, À CÔTÉ DES FAITS.
+    //
+    // catalogue.json porte une description libre, et rien ne la relit quand
+    // l'objet change. Elle a dérivé sans bruit : cadre-2 annonçait « 1 capture »
+    // alors qu'il en montrait trois, et les quatre cadres se disaient « non
+    // calibré » une fois calibrés. C'est la première chose qu'on lit du site.
+    //
+    // La contrôler par un analyseur de texte serait fragile — c'est de la prose.
+    // L'imprimer sous les chiffres suffit : le désaccord saute aux yeux à chaque
+    // passage, et corriger prend dix secondes.
+    detail: entree.detail ?? '',
   });
 }
 
@@ -126,7 +149,9 @@ if (ignores.length > 0) {
 console.log(`${new Set(chemins).size} requêtes, ${vus.size} modules ES, ${echecs} échec(s)`);
 for (const r of resumes) {
   const repere = r.repereOK ? '' : '  ⚠ REPÈRE DU DOCUMENT ≠ REPÈRE DE L’OBJET (calques refusés)';
-  console.log(`  ${r.id.padEnd(18)} ${String(r.captures).padStart(2)} capture(s)  ${r.echelle.padEnd(12)} ${r.calques} calque(s)${repere}`);
+  console.log(`  ${r.id.padEnd(18)} ${String(r.captures).padStart(2)} entrée(s)  ${r.echelle.padEnd(12)} `
+    + `${String(r.calques).padStart(2)} calque(s)${repere}`);
+  console.log(`  ${' '.repeat(18)} « ${r.detail} »`);
   if (!r.repereOK) echecs += 1;
 }
 process.exit(echecs ? 1 : 0);

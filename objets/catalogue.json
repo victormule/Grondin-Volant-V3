@@ -2,26 +2,31 @@
   {
     "id": "dactylopterus",
     "nom": "Dactylopterus Volantis",
-    "detail": "Grondin volant · 3 captures"
+    "detail": "Grondin volant naturalisé · dossier de démonstration"
   },
   {
     "id": "cadre-1",
     "nom": "Cadre 1",
-    "detail": "3 captures · non calibré"
+    "detail": "Cadre démonté, au sol · 3 captures"
   },
   {
     "id": "cadre-2",
     "nom": "Cadre 2",
-    "detail": "2 captures · non calibré"
+    "detail": "1 capture, 3 reconstructions"
   },
   {
     "id": "cadre-3",
     "nom": "Cadre 3",
-    "detail": "1 capture · non calibré"
+    "detail": "1 capture"
   },
   {
     "id": "cadre-4",
     "nom": "Cadre 4",
-    "detail": "1 capture · non calibré"
+    "detail": "1 capture"
+  },
+  {
+    "id": "musee-histoire-naturelle",
+    "nom": "Musée d’histoire naturelle",
+    "detail": "Spécimen naturalisé au sol · photogrammétrie et nuage LiDAR"
   }
 ]

@@ -14,6 +14,7 @@
 
 import { config, appliquer } from './reglages.js';
 import { definirObjet, definirCatalogue } from './objet.js';
+import { afficherAccueil } from './ui/accueil.js';
 
 // A blank page with an error in the console is the worst way to fail: the
 // person looking at it has no idea whether the site is broken or still
@@ -42,31 +43,43 @@ try {
   }
   definirCatalogue(catalogue);
 
-  // An unknown or absent ?objet= falls back to the first entry rather than
-  // failing: a bare URL is the normal way in, and a stale bookmark should land
-  // somewhere rather than nowhere.
+  // NO OBJECT ASKED FOR MEANS THE CATALOGUE, not a default object.
+  //
+  // Landing straight inside one of them made the others hard to discover: you
+  // had to work out that a catalogue existed before you could reach it. The
+  // bare URL now shows what there is. Nothing 3D is loaded here — the home
+  // page is text and a few JPEGs, and app.js (with three.js behind it) is only
+  // imported once an object is known.
+  //
+  // An unknown id falls back to the catalogue too: a stale bookmark should land
+  // somewhere that makes sense rather than on someone else's object.
   const demande = new URL(location.href).searchParams.get('objet');
-  const entree = catalogue.find((o) => o.id === demande) ?? catalogue[0];
+  const entree = catalogue.find((o) => o.id === demande);
+  if (!entree) {
+    afficherAccueil(document.getElementById('accueil'), catalogue);
+    document.title = 'Art’Scanner';
+  } else {
 
-  const manifeste = await lire(`./objets/${entree.id}/objet.json`, 'Manifeste illisible');
-  definirObjet(entree.id, manifeste);
-  appliquer(manifeste.reglages);
+    const manifeste = await lire(`./objets/${entree.id}/objet.json`, 'Manifeste illisible');
+    definirObjet(entree.id, manifeste);
+    appliquer(manifeste.reglages);
 
-  // The residuals file is named by the manifest; the measurement panel reads
-  // it through config, as it always has.
-  config.mesure.recalage = manifeste.recalage
-    ? `./objets/${entree.id}/${manifeste.recalage}`
-    : null;
+    // The residuals file is named by the manifest; the measurement panel reads
+    // it through config, as it always has.
+    config.mesure.recalage = manifeste.recalage
+      ? `./objets/${entree.id}/${manifeste.recalage}`
+      : null;
 
-  // Set before app.js runs so the page never flashes another object's name.
-  // app.js replaces the heading later if the document's own project sheet
-  // carries a title — the manifest name is the fallback, not the authority.
-  const nom = manifeste.nom ?? entree.nom ?? entree.id;
-  document.title = `${nom} — Visualisation 3D`;
-  const titre = document.getElementById('projectTitle');
-  if (titre) titre.textContent = nom;
+    // Set before app.js runs so the page never flashes another object's name.
+    // app.js replaces the heading later if the document's own project sheet
+    // carries a title — the manifest name is the fallback, not the authority.
+    const nom = manifeste.nom ?? entree.nom ?? entree.id;
+    document.title = `${nom} — Art’Scanner`;
+    const titre = document.getElementById('projectTitle');
+    if (titre) titre.textContent = nom;
 
-  await import('./app.js');
+    await import('./app.js');
+  }
 } catch (erreur) {
   echouer(`Objet introuvable. ${erreur.message}`, erreur);
 }

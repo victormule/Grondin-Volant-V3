@@ -1,7 +1,16 @@
 {
   "nom": "Cadre 3",
-  "repere": "cadre-3/oc-2026-08",
+  "repere": "cadre-3/oc-redresse-2026-08",
   "recalage": "sessions/_recalage.json",
+  "redressement": {
+    "rotationFace": 192,
+    "aPlat": false
+  },
+  "provenance": {
+    "export": "Cadre 3/Project 2026-08-26 #33_export_2026-08-26T19-57-24Z",
+    "commande": "C:\\Users\\Utilisateur\\Desktop\\FRANCOIS\\Francois\\outils\\ingerer.mjs \"Cadre 3/Project 2026-08-26 #33_export_2026-08-26T19-57-24Z\" --id cadre-3 --nom \"Cadre 3\" --rotation-face 192",
+    "ingere": "2026-08-28T14:16:31.676Z"
+  },
   "sessions": [
     {
       "id": "0EB4D665-605A-47C8-BE66-5A8A6D97E6C7",
@@ -13,24 +22,24 @@
   ],
   "reglages": {
     "camera": {
-      "distanceMin": 0.45,
-      "distanceMax": 22
+      "distanceMin": 0.44,
+      "distanceMax": 21
     },
     "peinture": {
-      "taille": 80,
+      "taille": 79,
       "tailleGomme": 80
     },
     "affichage": {
       "vueInitiale": {
         "azimut": 0,
-        "elevation": 20,
-        "marge": 1
+        "elevation": 0,
+        "marge": 1.02
       },
       "aplomb": null,
       "axeRotation": {
         "point": [
           0,
-          -9.313226e-10,
+          0,
           0
         ],
         "direction": [
@@ -39,6 +48,10 @@
           0
         ]
       }
+    },
+    "mesure": {
+      "longueurModeleReference": 2.052889,
+      "longueurReelleReference": 2.77
     }
   }
 }

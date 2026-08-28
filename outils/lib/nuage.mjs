@@ -131,3 +131,49 @@ export function espacement(points, echantillonTaille = 2000) {
 export const echantillonner = (points, cible) => (points.length <= cible
   ? points
   : points.filter((_, i) => i % Math.ceil(points.length / cible) === 0));
+
+// Sommets ET normales d'un OBJ, appariés par face.
+//
+// Le format OBJ indexe séparément positions, UV et normales : « f 1/1/1 » veut
+// dire sommet 1, UV 1, normale 1, et rien n'oblige les trois listes à se
+// correspondre. Object Capture écrit autant de vn que de v et les fait
+// coïncider, mais s'appuyer là-dessus serait s'appuyer sur une coïncidence :
+// on relit donc les faces pour associer chaque position à sa normale.
+export function lireNuageOBJ(chemin) {
+  const positions = [];
+  const normalesBrutes = [];
+  const texte = fs.readFileSync(chemin, 'utf8');
+  const faces = [];
+
+  let debut = 0;
+  while (debut < texte.length) {
+    let fin = texte.indexOf('\n', debut);
+    if (fin < 0) fin = texte.length;
+    const c0 = texte.charCodeAt(debut);
+    const c1 = texte.charCodeAt(debut + 1);
+    if (c0 === 118 && c1 === 32) {
+      const p = texte.slice(debut + 2, fin).split(' ');
+      positions.push([+p[0], +p[1], +p[2]]);
+    } else if (c0 === 118 && c1 === 110) {
+      const p = texte.slice(debut + 3, fin).split(' ');
+      normalesBrutes.push([+p[0], +p[1], +p[2]]);
+    } else if (c0 === 102 && c1 === 32) {
+      faces.push(texte.slice(debut + 2, fin).trim().split(/\s+/));
+    }
+    debut = fin + 1;
+  }
+
+  const normales = new Array(positions.length).fill(null);
+  for (const face of faces) {
+    for (const coin of face) {
+      const parts = coin.split('/');
+      const iv = Number(parts[0]);
+      const inor = parts.length > 2 && parts[2] ? Number(parts[2]) : 0;
+      if (!iv || !inor) continue;
+      const p = iv > 0 ? iv - 1 : positions.length + iv;
+      const n = inor > 0 ? inor - 1 : normalesBrutes.length + inor;
+      if (normales[p] === null && normalesBrutes[n]) normales[p] = normalesBrutes[n];
+    }
+  }
+  return { positions, normales };
+}

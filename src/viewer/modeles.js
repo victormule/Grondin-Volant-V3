@@ -12,6 +12,27 @@ export function chargerModele(url, surProgression) {
       (gltf) => {
         const racine = gltf.scene;
         const boite = new THREE.Box3().setFromObject(racine);
+
+        // LA TAILLE D'UN POINT.
+        //
+        // Un relevé peut arriver en nuage de points plutôt qu'en maillage —
+        // c'est la forme honnête d'un LiDAR, qui mesure des points et ne
+        // reconstruit une surface qu'en devinant. Le GLTFLoader crée alors un
+        // PointsMaterial d'un pixel, sans atténuation, comme le prescrit la
+        // spécification glTF : à l'écran, une poussière que le zoom ne fait pas
+        // grossir, et l'objet reste illisible de près.
+        //
+        // On repasse en taille du MONDE, calée sur la diagonale : chaque point
+        // couvre alors à peu près le volume qu'il représente, la surface se
+        // referme quand on approche et le nuage s'éclaircit quand on recule —
+        // ce qui est exactement ce qu'un nuage doit montrer de sa densité.
+        const diagonale = boite.getSize(new THREE.Vector3()).length();
+        racine.traverse((objet) => {
+          if (!objet.isPoints || !objet.material) return;
+          objet.material.sizeAttenuation = true;
+          objet.material.size = diagonale / 700;
+        });
+
         resoudre({ racine, boite });
       },
       (evenement) => {
@@ -30,6 +51,14 @@ export function appliquerMatiere(racine, { rugosite, metal, opacite = 1, anisotr
   racine.traverse((objet) => {
     if (!objet.material) return;
     for (const m of Array.isArray(objet.material) ? objet.material : [objet.material]) {
+      // Un nuage de points n'est pas branché sur l'atlas : son opacité ne
+      // transite par aucun nuanceur, elle s'applique directement. Sans ce cas,
+      // le curseur « opacité du modèle » resterait sans effet sur lui.
+      if (!objet.isMesh) {
+        m.opacity = facteurOpacite;
+        m.transparent = facteurOpacite < 1;
+        continue;
+      }
       if (m.roughness !== undefined) m.roughness = rugosite;
       if (m.metalness !== undefined) m.metalness = metal;
 

@@ -1,21 +1,41 @@
 {
   "nom": "Cadre 2",
-  "repere": "cadre-2/oc-2026-08",
+  "repere": "cadre-2/oc-redresse-2026-08",
   "recalage": "sessions/_recalage.json",
+  "redressement": {
+    "rotationFace": 266.27,
+    "aPlat": false
+  },
+  "provenance": {
+    "export": [
+      "Cadre 2 bis/Project 2026-08-26 #31_export_2026-08-26T18-42-15Z",
+      "Cadre 2 bis/Project 2026-08-26 #31_export_2026-08-28T14-45-06Z",
+      "Cadre 2 bis/Project 2026-08-26 #31_export_2026-08-28T14-51-09Z"
+    ],
+    "commande": "C:\\Users\\Utilisateur\\Desktop\\FRANCOIS\\Francois\\outils\\ingerer.mjs \"Cadre 2 bis/Project 2026-08-26 #31_export_2026-08-26T18-42-15Z\" \"Cadre 2 bis/Project 2026-08-26 #31_export_2026-08-28T14-45-06Z\" \"Cadre 2 bis/Project 2026-08-26 #31_export_2026-08-28T14-51-09Z\" --id cadre-2 --nom \"Cadre 2\" --rotation-face 266.27 --reference AA96D4B3 --exclure 9E5790DA --sans-decoupe",
+    "ingere": "2026-08-28T15:12:09.774Z"
+  },
   "sessions": [
     {
-      "id": "48F31E95-A0F2-4679-B10C-54736F8BDD4C",
-      "label": "Capture 1",
+      "id": "48F31E95-A0F2-4679-B10C-54736F8BDD4C-AA96D4B3",
+      "label": "Capture 1 · calcul 1",
       "date": "26 août 2026",
-      "time": "10:06 – 10:10",
-      "glb": "sessions/48F31E95-A0F2-4679-B10C-54736F8BDD4C/model.glb"
+      "time": "28 images",
+      "glb": "sessions/48F31E95-A0F2-4679-B10C-54736F8BDD4C-AA96D4B3/model.glb"
     },
     {
-      "id": "9E5790DA-2D4C-4C29-81FF-FC9FCA8F2192",
-      "label": "Capture 2",
-      "date": "26 août 2026",
-      "time": "10:12 – 10:16",
-      "glb": "sessions/9E5790DA-2D4C-4C29-81FF-FC9FCA8F2192/model.glb"
+      "id": "48F31E95-A0F2-4679-B10C-54736F8BDD4C-F4DFE0B5",
+      "label": "Capture 1 · calcul 2",
+      "date": "28 août 2026",
+      "time": "28 images",
+      "glb": "sessions/48F31E95-A0F2-4679-B10C-54736F8BDD4C-F4DFE0B5/model.glb"
+    },
+    {
+      "id": "48F31E95-A0F2-4679-B10C-54736F8BDD4C-01288A78",
+      "label": "Capture 1 · calcul 3",
+      "date": "28 août 2026",
+      "time": "18 images",
+      "glb": "sessions/48F31E95-A0F2-4679-B10C-54736F8BDD4C-01288A78/model.glb"
     }
   ],
   "reglages": {
@@ -30,14 +50,14 @@
     "affichage": {
       "vueInitiale": {
         "azimut": 0,
-        "elevation": 20,
-        "marge": 1
+        "elevation": 0,
+        "marge": 1.02
       },
       "aplomb": null,
       "axeRotation": {
         "point": [
           0,
-          -3.72529e-9,
+          0,
           0
         ],
         "direction": [
@@ -46,6 +66,10 @@
           0
         ]
       }
+    },
+    "mesure": {
+      "longueurModeleReference": 1.698889,
+      "longueurReelleReference": 2.81
     }
   }
 }

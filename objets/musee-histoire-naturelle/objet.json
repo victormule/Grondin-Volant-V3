@@ -1,0 +1,60 @@
+{
+  "nom": "Musée d'histoire naturelle",
+  "repere": "musee-histoire-naturelle/oc-redresse-2026-08",
+  "recalage": "sessions/_recalage.json",
+  "redressement": {
+    "rotationFace": 0,
+    "aPlat": true
+  },
+  "provenance": {
+    "export": "sources/Project 2026-08-27 #37_export_2026-08-28T16-44-48Z",
+    "commande": "C:\\Users\\Utilisateur\\Desktop\\FRANCOIS\\Francois\\outils\\ingerer.mjs \"sources/Project 2026-08-27 #37_export_2026-08-28T16-44-48Z\" --id musee-histoire-naturelle --nom \"Musée d'histoire naturelle\" --a-plat --maillage \"LiDAR=sources/Project 2026-08-27 #37_export_2026-08-28T17-20-29Z/sessions/DE1EAFF9-052B-49B9-A544-FC9FBD1EF135/scene/sparse_cloud_DE1EAFF9-052B-49B9-A544-FC9FBD1EF135.ply\"",
+    "ingere": "2026-08-28T17:31:04.396Z"
+  },
+  "sessions": [
+    {
+      "id": "DE1EAFF9-052B-49B9-A544-FC9FBD1EF135",
+      "label": "Photogrammétrie",
+      "date": "27 août 2026",
+      "time": "10:58 – 11:17",
+      "glb": "sessions/DE1EAFF9-052B-49B9-A544-FC9FBD1EF135/model.glb"
+    },
+    {
+      "id": "lidar",
+      "label": "LiDAR",
+      "date": "27 août 2026",
+      "time": "256 k sommets",
+      "glb": "sessions/lidar/model.glb"
+    }
+  ],
+  "reglages": {
+    "camera": {
+      "distanceMin": 0.29,
+      "distanceMax": 14
+    },
+    "peinture": {
+      "taille": 53,
+      "tailleGomme": 64
+    },
+    "affichage": {
+      "vueInitiale": {
+        "azimut": 0,
+        "elevation": 62,
+        "marge": 1.05
+      },
+      "aplomb": null,
+      "axeRotation": {
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ]
+      }
+    }
+  }
+}

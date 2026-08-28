@@ -441,6 +441,15 @@ export class AtlasPeinture {
     const texture = capture.sortie.texture;
     capture.racine.traverse((objet) => {
       if (!objet.material) return;
+      // L'ATLAS EST UNE AFFAIRE DE MAILLAGES.
+      //
+      // Il se lit par coordonnées de texture, et un nuage de points n'en a pas.
+      // Le brancher quand même posait « USE_UV » sur un PointsMaterial dont la
+      // géométrie ne porte pas d'attribut uv : le nuanceur échantillonnait alors
+      // l'atlas en (0,0) et teintait tout le nuage de la couleur qui s'y trouve.
+      // Le relevé LiDAR du muséum est un nuage ; il s'affiche, il ne se peint
+      // pas, et c'est ici que la distinction se fait.
+      if (!objet.isMesh) return;
       for (const m of Array.isArray(objet.material) ? objet.material : [objet.material]) {
         if (m.userData.__atlasBranche) {
           m.userData.__atlasUniforme.value = texture;
