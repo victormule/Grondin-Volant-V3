@@ -38,7 +38,7 @@ import { inverse, multiplier, appliquer, echelleDe, IDENTITE } from './lib/matri
 import { lireNuageOBJ, boite, espacement } from './lib/nuage.mjs';
 import { recaler, recalerSansAmorce } from './lib/icp.mjs';
 import { recalerPlan, jugerRecalage } from './lib/icp-plan.mjs';
-import { poseFaceCamera } from './lib/redressement.mjs';
+import { poseFaceCamera, caleAuSol } from './lib/redressement.mjs';
 import { decouper } from './lib/decoupe.mjs';
 import { lireNuagePLY } from './lib/ply.mjs';
 
@@ -358,6 +358,10 @@ if (!sansRedressement) {
 }
 for (const c of publiees) c.Mfinal = multiplier(pose.M, c.M);
 
+// La référence dans le repère où l'objet sera publié : verticale en +Y, sol à
+// zéro. C'est là que se comparent les hauteurs d'une couche à l'autre.
+const refFinal = ref.nuage.positions.map((p) => appliquer(pose.M, p));
+
 /* --------------------------------------------- les maillages d'un autre procédé */
 
 // LE MONDE ARKit EST LE TERRAIN D'ENTENTE.
@@ -445,7 +449,35 @@ for (const m of maillages) {
       + `  (médiane ${mm(avant.mediane)} → ${mm(apres.mediane)}, échelle ×${echelleDe(essai.M).toFixed(4)})`);
     if (!mieux) console.log('  le raffinement n’améliore rien : matrice ARKit conservée');
   }
-  const versObjet = multiplier(pose.M, multiplier(correction, versRef));
+  let versObjet = multiplier(pose.M, multiplier(correction, versRef));
+
+  // LE SOL EST LE MÊME SOL.
+  //
+  // Après l'ICP, le relevé LiDAR du muséum flottait encore d'un centimètre
+  // au-dessus de la photogrammétrie — assez peu pour que le résidu ne s'en
+  // émeuve pas, assez pour qu'on le voie à la ligne de contact. Les deux
+  // couches ont mesuré le même sol : c'est lui qui tranche.
+  const pointsFinals = [];
+  for (let i = 0; i < nbPoints; i += 1) {
+    const brut = estNuage
+      ? [source[i * 3], source[i * 3 + 1], source[i * 3 + 2]]
+      : donnees.positions[i];
+    pointsFinals.push(appliquer(versObjet, brut));
+  }
+  const cale = caleAuSol(pointsFinals, refFinal, {
+    pas: bref.diagonale / 120,
+    bande: bref.diagonale / 40,
+  });
+  if (cale) {
+    versObjet = multiplier([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -cale.ecart, 0, 1], versObjet);
+    const cm = (x) => (x * 100 * echelleReelle).toFixed(1);
+    const sens = cale.ecart >= 0 ? 'au-dessus' : 'en dessous';
+    console.log(`« ${m.etiquette} » : son sol tombait ${cm(Math.abs(cale.ecart))} cm ${sens} de celui de `
+      + `la photogrammétrie, sur ${cale.cellules} cellules communes `
+      + `(quartiles ${cm(cale.q25)} et ${cm(cale.q75)} cm) — couche translatée d’autant`);
+  } else {
+    console.log(`« ${m.etiquette} » : pas assez de sol commun pour caler la hauteur — laissée telle quelle`);
+  }
 
   if (estNuage) {
     const nuage = donnees;
@@ -488,7 +520,7 @@ for (const m of maillages) {
     + 'placé par la matrice d’alignement ARKit de la référence');
 }
 
-const boiteFinale = boite(ref.nuage.positions.map((p) => appliquer(pose.M, p)));
+const boiteFinale = boite(refFinal);
 
 // L'emprise demandée à la main, si elle l'a été.
 let boiteRecadree = boiteFinale;

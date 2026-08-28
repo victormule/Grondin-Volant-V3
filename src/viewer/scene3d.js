@@ -402,14 +402,13 @@ export class Scene3D {
     // constant. Colour and alpha get the same factor, which keeps the buffer's
     // premultiplied alpha consistent over the transparent page background.
     this.renderer.clear();
-    this.couches.forEach((couche, i) => {
-      if (!couche) return;
+    for (const i of this._ordreCouches()) {
       const materiau = this._materiauxQuad[i];
       materiau.uniforms.image.value = this._captures[i];
       materiau.blendAlpha = this._opaciteCouche(i);
       this._quad.material = materiau;
       this.renderer.render(this._sceneQuad, this._cameraQuad);
-    });
+    }
   }
 
   // DEUX FAÇONS D'EMPILER, UN SEUL JEU DE POIDS.
@@ -420,9 +419,9 @@ export class Scene3D {
   // exactement ça : la n-ième posée à 1/n sur la moyenne des précédentes.
   //
   // « Superposition » : chaque capture recouvre celle du dessous à l'opacité
-  // qu'on lui donne, la première tout en bas, la dernière tout en haut. C'est
-  // le calque au sens ordinaire — poser le LiDAR à 40 % sur la photogrammétrie
-  // pour voir l'un à travers l'autre.
+  // qu'on lui donne, la première tout en haut, la dernière tout en bas. C'est
+  // le calque au sens ordinaire — poser le LiDAR sous la photogrammétrie et
+  // baisser celle-ci à 40 % pour voir l'un à travers l'autre.
   //
   // Les deux lisent le même tableau de poids. Avec des poids tous à un, la
   // moyenne pondérée redonne 1/(index+1) : le comportement d'avant, au bit près.
@@ -430,6 +429,22 @@ export class Scene3D {
     this.melangeComposite = mode === 'pile' ? 'pile' : 'moyenne';
     if (Array.isArray(poids)) this.poidsComposite = poids.slice();
     if (this.mode === 'composite') this.demanderRendu();
+  }
+
+  // L'ORDRE DE POSE.
+  //
+  // En superposition, c'est la PREMIÈRE capture qu'on regarde — celle dont on
+  // veut le rendu net, les autres servant à la confronter. Elle est donc posée
+  // en dernier, c'est-à-dire au-dessus, et les suivantes s'enfoncent dans la
+  // pile : premier calcul devant, procédé de référence devant.
+  //
+  // En moyenne l'ordre ne change rien au résultat — une moyenne pondérée ne
+  // dépend pas de l'ordre des termes — mais le cumul des opacités, lui, se
+  // calcule dans l'ordre où l'on pose. Les deux lisent donc la même liste.
+  _ordreCouches() {
+    const presentes = [];
+    for (let i = 0; i < this.couches.length; i += 1) if (this.couches[i]) presentes.push(i);
+    return this.melangeComposite === 'pile' ? presentes.reverse() : presentes;
   }
 
   _poidsCouche(index) {
@@ -446,7 +461,10 @@ export class Scene3D {
     // Les couches absentes ne comptent pas — sinon la première capture chargée
     // d'un objet à trous serait posée à un demi sur du vide.
     let cumul = 0;
-    for (let i = 0; i <= index; i += 1) if (this.couches[i]) cumul += this._poidsCouche(i);
+    for (const i of this._ordreCouches()) {
+      cumul += this._poidsCouche(i);
+      if (i === index) break;
+    }
     return cumul > 0 ? poids / cumul : 0;
   }
 

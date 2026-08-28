@@ -1950,7 +1950,7 @@ async function chargerSessions() {
     bouton.type = 'button';
     bouton.className = 'session-tab';
     bouton.setAttribute('aria-pressed', 'false');
-    bouton.innerHTML = `Toutes les sessions<span>Superposition des ${sessions.length} captures</span>`;
+    bouton.innerHTML = `Toutes les sessions<span>Les ${sessions.length} captures ensemble</span>`;
     bouton.addEventListener('click', () => choisirComposite(sessions, bouton));
     elements.listeSessions.appendChild(bouton);
     elements.listeSessions.appendChild(construireMelange(sessions));
@@ -1963,10 +1963,11 @@ async function chargerSessions() {
 // capture est à l'écran et ces curseurs ne commanderaient rien. Replié le reste
 // du temps, il ne coûte pas une ligne au panneau.
 //
-// Les curseurs suivent l'ordre du manifeste, qui est aussi l'ordre d'empilement
-// — la première dessous, la dernière dessus. C'est dit une fois, en petit, sous
-// le sélecteur de mode : le panneau n'a pas à répéter à chaque ligne ce qu'un
-// coup d'œil à la liste apprend.
+// Les curseurs suivent l'ordre du manifeste, et cet ordre EST celui de la pile,
+// lue comme on lit la liste : la première ligne est la couche du dessus, la
+// dernière est celle du fond. C'est dit une fois, en petit, sous le sélecteur de
+// mode — le panneau n'a pas à répéter à chaque ligne ce qu'un coup d'œil à la
+// liste apprend.
 function construireMelange(sessions) {
   const bloc = document.createElement('div');
   bloc.className = 'melange-sessions';
@@ -2002,7 +2003,7 @@ function construireMelange(sessions) {
 
   const ordre = document.createElement('p');
   ordre.className = 'melange-ordre';
-  ordre.textContent = 'La première dessous, la dernière dessus.';
+  ordre.textContent = 'En superposition : la première au-dessus, la dernière au fond.';
 
   bloc.append(choix, ordre);
 

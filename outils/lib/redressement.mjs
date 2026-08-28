@@ -115,6 +115,64 @@ function planDuSol(points, tolerance) {
   return { N, d, part: dedans / points.length, cellules: retenus.length, rms };
 }
 
+/* --------------------------- poser une couche sur le sol d'une autre */
+
+// DEUX RELEVÉS DU MÊME SOL DOIVENT LE POSER À LA MÊME HAUTEUR.
+//
+// L'ICP minimise un résidu de point à point sur toute la zone commune, et cette
+// zone est dominée par le spécimen : un biais vertical d'un centimètre au sol
+// ne lui coûte presque rien. À l'œil il coûte beaucoup — au ras du sol, un
+// centimètre est une ligne de contact qui flotte, et c'est la première chose
+// qu'on voit en passant d'un procédé à l'autre.
+//
+// La mesure ici ne suppose aucun modèle et ne dépend d'aucun ajustement : on
+// maille le plan horizontal, on ne garde que les cellules où LES DEUX couches
+// ont vu le sol — la bande basse — et on compare leurs hauteurs médianes. La
+// médiane des écarts est le décalage ; les quartiles disent s'il est net ou
+// s'il varie d'un bout à l'autre de la salle, auquel cas il ne s'agit pas d'un
+// décalage mais d'une inclinaison, et une translation serait un cache-misère.
+//
+// Ce qu'on en fait est une TRANSLATION, rien d'autre : aucun point n'est
+// écarté, aucun recadrage, le sol reste entier — il est la donnée.
+export function caleAuSol(source, reference, options = {}) {
+  const pas = options.pas ?? 0.03;
+  const bande = options.bande ?? 0.06;
+  const niveau = options.niveau ?? 0;
+  const minimum = options.minimum ?? 4;
+
+  const cellules = (points) => {
+    const g = new Map();
+    for (const p of points) {
+      if (p[1] > niveau + bande || p[1] < niveau - bande) continue;
+      const cle = `${Math.round(p[0] / pas)},${Math.round(p[2] / pas)}`;
+      const v = g.get(cle);
+      if (v) v.push(p[1]); else g.set(cle, [p[1]]);
+    }
+    return g;
+  };
+  const mediane = (v) => { v.sort((a, b) => a - b); return v[v.length >> 1]; };
+
+  const aRef = cellules(reference);
+  const aSrc = cellules(source);
+  const ecarts = [];
+  for (const [cle, hauteursRef] of aRef) {
+    const hauteursSrc = aSrc.get(cle);
+    if (!hauteursSrc || hauteursRef.length < minimum || hauteursSrc.length < minimum) continue;
+    ecarts.push(mediane(hauteursSrc) - mediane(hauteursRef));
+  }
+  // Trop peu de sol commun pour trancher : on ne déplace rien plutôt que de
+  // caler sur trois cellules.
+  if (ecarts.length < 20) return null;
+  ecarts.sort((a, b) => a - b);
+  const quantile = (f) => ecarts[Math.floor(f * (ecarts.length - 1))];
+  return {
+    ecart: ecarts[ecarts.length >> 1],
+    cellules: ecarts.length,
+    q25: quantile(0.25),
+    q75: quantile(0.75),
+  };
+}
+
 /* --------------------------------- plan dominant, par RANSAC puis moindres carrés */
 
 function planRansac(points, tolerance, essais = 800) {
