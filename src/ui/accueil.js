@@ -18,40 +18,36 @@
 export function afficherAccueil(hote, catalogue) {
   hote.replaceChildren();
 
-  // L'EN-TÊTE PORTE LE NOM DU SITE, PAS LA CONSIGNE.
+  // L'EN-TÊTE PORTE LE NOM DU SITE, PUIS CE QU'IL FAIT, PUIS POUR QUI.
   //
-  // « Choisir un objet » en titre décrivait ce qu'on fait sur la page, ce que
-  // la grille dit déjà toute seule. Le titre nomme maintenant le site, et la
-  // consigne descend en étiquette au-dessus des cartes, là où elle sert.
+  // Trois lignes, dans cet ordre, parce qu'un visiteur qui arrive ici ne sait
+  // encore rien : le nom, la phrase qui le situe, et un paragraphe court écrit
+  // dans les mots du métier — constat d'état, transport, prêt, intervention.
+  // Personne n'a besoin qu'on lui dise qu'il est conservateur ou régisseur : le
+  // vocabulaire suffit à dire à qui la page s'adresse.
+  //
+  // Ce qui n'est PAS ici : le nom de l'auteur. Il descend au pied de page, avec
+  // le crédit d'acquisition — voir plus bas.
   const entete = document.createElement('header');
   entete.className = 'accueil-entete';
 
   const titre = document.createElement('h1');
   titre.className = 'accueil-titre';
-  titre.textContent = 'Art’Scanner';
+  titre.textContent = 'Galatée';
 
   const signature = document.createElement('p');
   signature.className = 'accueil-signature';
-  signature.append('Numérisation 3D pour le patrimoine');
+  signature.textContent = 'Visualisation et annotation 3D pour les collections de musée et le patrimoine';
 
-  const point = document.createElement('span');
-  point.className = 'accueil-point';
-  // Décoratif : un lecteur d'écran n'a pas à annoncer une puce de séparation.
-  point.setAttribute('aria-hidden', 'true');
-  point.textContent = '·';
+  const propos = document.createElement('p');
+  propos.className = 'accueil-propos';
+  propos.textContent = 'Un constat d’état posé sur l’objet lui-même plutôt que sur une '
+    + 'photographie : le relevé se regarde sous tous les angles, se mesure — avec son '
+    + 'incertitude à côté du chiffre — et s’annote à l’endroit exact qui le demande. '
+    + 'Les relevés d’un même objet se superposent d’une date à l’autre : avant un '
+    + 'transport, après une intervention, au retour d’un prêt. Rien à installer, un lien suffit.';
 
-  const auteur = document.createElement('a');
-  auteur.className = 'accueil-auteur';
-  auteur.href = 'https://victor-mule.netlify.app/';
-  // Le portfolio est un autre site : l'ouvrir à côté plutôt qu'à la place de
-  // celui-ci, pour ne pas faire perdre le catalogue qu'on était en train de
-  // parcourir. « noopener » coupe l'accès de la page ouverte à celle-ci.
-  auteur.target = '_blank';
-  auteur.rel = 'noopener noreferrer';
-  auteur.textContent = 'Victor Mulé';
-
-  signature.append(' ', point, ' By ', auteur);
-  entete.append(titre, signature);
+  entete.append(titre, signature, propos);
 
   // Le bandeau qui sépare l'identité du site de son contenu : l'étiquette d'un
   // côté, le compte de l'autre, sur un filet.
@@ -62,9 +58,11 @@ export function afficherAccueil(hote, catalogue) {
   invite.textContent = 'Choisir un objet';
   const compte = document.createElement('span');
   compte.className = 'accueil-compte';
+  // Le compte ne nomme plus le procédé : tous les objets ne sont pas relevés
+  // de la même façon, et le muséum en porte deux à lui seul.
   compte.textContent = catalogue.length > 1
-    ? `${catalogue.length} objets relevés en photogrammétrie`
-    : 'Un objet relevé en photogrammétrie';
+    ? `${catalogue.length} objets relevés`
+    : 'Un objet relevé';
   bandeau.append(invite, compte);
 
   const grille = document.createElement('div');
@@ -102,7 +100,41 @@ export function afficherAccueil(hote, catalogue) {
     grille.appendChild(carte);
   }
 
-  hote.append(entete, bandeau, grille);
+  // LE PIED DE PAGE : QUI A FAIT QUOI.
+  //
+  // Deux lignes, et l'ordre n'est pas indifférent. Les relevés viennent de
+  // dür.air, l'application de photogrammétrie du laboratoire MAP (CNRS) : sans
+  // lui il n'y aurait rien à montrer, et le dire est simplement exact. La
+  // seconde ligne dit ce que l'auteur de ce site a fait — le site — et rien de
+  // plus. Elles sont en bas parce que c'est là qu'on cherche un crédit, et
+  // parce qu'une page qui présente des objets ne commence pas par présenter
+  // celui qui l'a écrite.
+  const pied = document.createElement('footer');
+  pied.className = 'accueil-pied';
+
+  const acquisition = document.createElement('p');
+  const durair = document.createElement('a');
+  durair.href = 'https://durair.map.cnrs.fr/';
+  durair.target = '_blank';
+  durair.rel = 'noopener noreferrer';
+  durair.textContent = 'dür.air';
+  acquisition.append('Acquisitions photogrammétriques et LiDAR réalisées avec ', durair,
+    ', développé par le laboratoire MAP (CNRS).');
+
+  const application = document.createElement('p');
+  const auteur = document.createElement('a');
+  auteur.href = 'https://victor-mule.netlify.app/';
+  // Le portfolio est un autre site : l'ouvrir à côté plutôt qu'à la place de
+  // celui-ci, pour ne pas faire perdre le catalogue qu'on était en train de
+  // parcourir. « noopener » coupe l'accès de la page ouverte à celle-ci.
+  auteur.target = '_blank';
+  auteur.rel = 'noopener noreferrer';
+  auteur.textContent = 'Victor Mulé';
+  application.append('Galatée est conçu et développé par ', auteur, '.');
+
+  pied.append(acquisition, application);
+
+  hote.append(entete, bandeau, grille, pied);
   hote.hidden = false;
   document.body.classList.add('sur-accueil');
 }

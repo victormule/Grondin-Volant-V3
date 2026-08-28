@@ -1834,17 +1834,28 @@ async function obtenirCouche(session, index) {
   }
 }
 
+// CE QUI EST SÉLECTIONNÉ, ET DANS QUELLE SESSION.
+//
+// Un bouton peut être une session (premier niveau) ou l'une de ses itérations
+// (second niveau). Marquer l'itération sans marquer sa session laisserait la
+// liste sans repère : on presse donc les deux, ce qui est aussi la vérité —
+// cette session est ouverte, et dans cette session, cette itération.
 function marquerOnglet(bouton) {
-  const onglets = [...elements.listeSessions.querySelectorAll('.session-tab')];
-  for (const onglet of onglets) {
-    onglet.setAttribute('aria-pressed', String(onglet === bouton));
-  }
-  // Le réglage du mélange n'a de sens que sous le dernier onglet, celui qui
-  // met toutes les captures à l'écran. Ailleurs il commanderait le vide.
-  if (elements.melange) elements.melange.hidden = bouton !== onglets.at(-1);
+  const boutons = elements.listeSessions.querySelectorAll('.session-tab, .session-iteration');
+  for (const autre of boutons) autre.setAttribute('aria-pressed', String(autre === bouton));
+  const session = bouton?.closest('.session-groupe')?.querySelector('.session-tab');
+  if (session) session.setAttribute('aria-pressed', 'true');
+  // Le réglage du mélange n'a de sens que sous le bouton qui met toutes les
+  // couches à l'écran. Ailleurs il commanderait le vide.
+  if (elements.melange) elements.melange.hidden = bouton !== boutonComposite;
 }
 
+
 let revisionVue = 0;
+// Le bouton qui met toutes les couches à l'écran. Il change de place selon que
+// l'objet a une session ou plusieurs, d'où cette référence plutôt qu'un
+// « dernier onglet de la liste ».
+let boutonComposite = null;
 
 async function choisirSession(session, index, bouton) {
   const revision = ++revisionVue;
@@ -1914,7 +1925,7 @@ async function choisirComposite(sessions, bouton) {
   // All three atlases are recomposed, each in its own UV space. Painting and
   // measuring target the first, the frame all the others were aligned onto.
   definirCaptures(sessions.map((session, index) => cleCapture(session, index)));
-  elements.sousTitre.textContent = `Les ${sessions.length} sessions superposées`;
+  elements.sousTitre.textContent = `Superposition des ${sessions.length}`;
 }
 
 async function chargerSessions() {
@@ -1927,34 +1938,107 @@ async function chargerSessions() {
   if (sessions.length === 0) {
     elements.listeSessions.hidden = true;
     elements.sousTitre.textContent = 'Aucune capture';
-    afficherStatut(`« ${objet.nom} » ne déclare aucune capture dans son objet.json.`);
+    afficherStatut(`« ${objet.nom} » ne déclare aucune capture dans son objet.json.`);
     return;
   }
   sessionsConnues = sessions;
   panneauDroit.definirSessions(sessions);
 
+  // LES SESSIONS D'ABORD, CE QU'ELLES CONTIENNENT ENSUITE.
+  //
+  // Le manifeste liste les entrées à plat et dit, pour celles qui en ont une, à
+  // quelle session elles appartiennent. Les entrées d'une même session se
+  // suivent : on les rassemble en un bloc, la session en tête, ses itérations
+  // en dessous. Une entrée sans session est une session à elle seule et garde
+  // exactement l'onglet qu'elle avait.
+  const groupes = [];
   sessions.forEach((session, index) => {
-    const bouton = document.createElement('button');
-    bouton.type = 'button';
-    bouton.className = 'session-tab';
-    bouton.setAttribute('aria-pressed', 'false');
-    bouton.innerHTML = `${session.label}<span>${session.date} · ${session.time}</span>`;
-    bouton.addEventListener('click', () => choisirSession(session, index, bouton));
-    elements.listeSessions.appendChild(bouton);
-
-    if (index === 0) choisirSession(session, index, bouton);
+    const dernier = groupes.at(-1);
+    if (session.groupe && dernier?.nom === session.groupe) dernier.entrees.push({ session, index });
+    else groupes.push({ nom: session.groupe ?? null, entrees: [{ session, index }] });
   });
 
+  for (const groupe of groupes) {
+    const bloc = document.createElement('div');
+    bloc.className = 'session-groupe';
+
+    const premiere = groupe.entrees[0].session;
+    const onglet = document.createElement('button');
+    onglet.type = 'button';
+    onglet.className = 'session-tab';
+    onglet.setAttribute('aria-pressed', 'false');
+    // Une session à plusieurs itérations n'a pas d'heure propre : ses entrées
+    // en ont chacune une, et c'est le sous-titre de chacune qui la porte.
+    const meta = groupe.entrees.length > 1 ? premiere.date : `${premiere.date} · ${premiere.time}`;
+    onglet.append(groupe.nom ?? premiere.label, elementMeta(meta));
+    bloc.appendChild(onglet);
+
+    if (groupe.entrees.length === 1) {
+      const { session, index } = groupe.entrees[0];
+      onglet.addEventListener('click', () => choisirSession(session, index, onglet));
+      groupe.premierBouton = onglet;
+    } else {
+      const rangee = document.createElement('div');
+      rangee.className = 'session-iterations';
+      for (const { session, index } of groupe.entrees) {
+        const sous = document.createElement('button');
+        sous.type = 'button';
+        sous.className = 'session-iteration';
+        sous.setAttribute('aria-pressed', 'false');
+        sous.textContent = session.label;
+        sous.title = `${session.date} · ${session.time}`;
+        sous.addEventListener('click', () => choisirSession(session, index, sous));
+        rangee.appendChild(sous);
+        groupe.premierBouton = groupe.premierBouton ?? sous;
+      }
+      bloc.appendChild(rangee);
+      // Presser la session ouvre sa première itération : le premier niveau ne
+      // sélectionne rien à lui seul, il désigne un ensemble.
+      onglet.addEventListener('click', () => {
+        const { session, index } = groupe.entrees[0];
+        choisirSession(session, index, groupe.premierBouton);
+      });
+      groupe.rangee = rangee;
+    }
+
+    elements.listeSessions.appendChild(bloc);
+  }
+
   if (sessions.length > 1) {
-    const bouton = document.createElement('button');
-    bouton.type = 'button';
-    bouton.className = 'session-tab';
-    bouton.setAttribute('aria-pressed', 'false');
-    bouton.innerHTML = `Toutes les sessions<span>Les ${sessions.length} captures ensemble</span>`;
-    bouton.addEventListener('click', () => choisirComposite(sessions, bouton));
-    elements.listeSessions.appendChild(bouton);
+    boutonComposite = document.createElement('button');
+    boutonComposite.type = 'button';
+    boutonComposite.setAttribute('aria-pressed', 'false');
+    boutonComposite.addEventListener('click', () => choisirComposite(sessions, boutonComposite));
+
+    // LA SUPERPOSITION SE RANGE OÙ ELLE APPARTIENT.
+    //
+    // Quand tout l'objet tient dans une seule session, superposer ses itérations
+    // est une façon de la regarder, pas une session de plus : le bouton rejoint
+    // la rangée, à sa suite. Dès qu'il y a plusieurs sessions, il les traverse
+    // toutes et reprend sa place d'onglet, sous elles.
+    const seule = groupes.length === 1 && groupes[0].rangee;
+    if (seule) {
+      boutonComposite.className = 'session-iteration session-iteration-tout';
+      boutonComposite.textContent = 'Superposer';
+      boutonComposite.title = `Les ${sessions.length} ensemble`;
+      groupes[0].rangee.appendChild(boutonComposite);
+    } else {
+      boutonComposite.className = 'session-tab';
+      boutonComposite.append('Toutes les sessions', elementMeta(`Les ${sessions.length} ensemble`));
+      elements.listeSessions.appendChild(boutonComposite);
+    }
     elements.listeSessions.appendChild(construireMelange(sessions));
   }
+
+  const depart = groupes[0].premierBouton;
+  choisirSession(sessions[0], 0, depart);
+}
+
+// Le sous-titre d'un onglet : la date et l'heure, en petit, sous son nom.
+function elementMeta(texte) {
+  const meta = document.createElement('span');
+  meta.textContent = texte;
+  return meta;
 }
 
 // LE RÉGLAGE DU MÉLANGE, ET SEULEMENT QUAND IL SERT.
@@ -1987,7 +2071,7 @@ function construireMelange(sessions) {
   tete.className = 'melange-tete';
   const titre = document.createElement('span');
   titre.className = 'melange-titre';
-  titre.textContent = 'Opacité de chaque capture';
+  titre.textContent = 'Opacité';
   const egaliser = document.createElement('button');
   egaliser.type = 'button';
   egaliser.className = 'melange-egal';

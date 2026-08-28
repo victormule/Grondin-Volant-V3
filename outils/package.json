@@ -1,8 +1,8 @@
 {
-  "name": "artscanner-outils",
+  "name": "galatee-outils",
   "private": true,
   "type": "module",
-  "description": "Chaîne d'ingestion et outils de vérification d'Art'Scanner. Le site, à la racine, n'a aucune dépendance : ces paquets ne servent qu'à fabriquer les .glb qu'il sert. Ils vivent ici pour que la racine publiée ne contienne rien qu'un navigateur n'aille chercher — et pour qu'aucun hébergeur n'essaie de les installer.",
+  "description": "Chaîne d'ingestion et outils de vérification de Galatée. Le site, à la racine, n'a aucune dépendance : ces paquets ne servent qu'à fabriquer les .glb qu'il sert. Ils vivent ici pour que la racine publiée ne contienne rien qu'un navigateur n'aille chercher — et pour qu'aucun hébergeur n'essaie de les installer.",
   "scripts": {
     "verifier": "cd .. && node outils/verifier.mjs",
     "ingerer": "cd .. && node outils/ingerer.mjs",

@@ -425,6 +425,67 @@ button:disabled {
   opacity: 1;
 }
 
+/* LES ITÉRATIONS D'UNE SESSION.
+   ==========================================================================
+
+   Une session est une séance devant l'objet ; ce qu'elle a produit tient sous
+   elle. Trois calculs d'une même prise, ou une photogrammétrie et un nuage
+   LiDAR relevés dans le même passage : ce sont des façons de regarder la même
+   séance, pas des séances de plus.
+
+   D'où deux niveaux et non deux listes : l'onglet garde son filet et sa date,
+   la rangée en dessous tient dans sa marge, en petits boutons de la largeur de
+   leur texte. La hiérarchie se lit sans qu'on ait rien à expliquer. */
+.session-groupe {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.session-iterations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.28rem;
+  margin: -0.1rem 0 0.15rem 0.78rem;
+  padding-left: 0.62rem;
+  border-left: 1px solid var(--border);
+}
+
+.session-iteration {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  padding: 0.26rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.session-iteration:hover {
+  background: var(--surbrillance);
+  color: var(--text);
+}
+
+.session-iteration[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--accent-doux);
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Superposer n'est pas une itération de plus : c'est la façon de les voir
+   ensemble. Le trait interrompu le dit sans un mot de plus. */
+.session-iteration-tout {
+  border-style: dashed;
+}
+
 .button-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1562,22 +1623,48 @@ body.sur-accueil > *:not(.accueil) { display: none !important; }
 }
 
 .accueil-signature {
-  margin: 0;
+  margin: 0 auto;
+  max-width: 44rem;
   color: var(--muted);
   font-size: clamp(0.86rem, 1.6vw, 0.98rem);
   font-weight: 450;
   letter-spacing: 0.004em;
 }
 
-.accueil-point {
-  margin: 0 0.12rem;
-  opacity: 0.55;
+/* Le paragraphe qui dit à quoi sert le site. Étroit — quarante-cinq caractères
+   par ligne environ — parce qu'un texte centré devient illisible dès qu'il
+   s'étale : l'œil perd le début de la ligne suivante. */
+.accueil-propos {
+  max-width: 42rem;
+  margin: 1.15rem auto 0;
+  color: var(--muted);
+  font-size: clamp(0.84rem, 1.5vw, 0.94rem);
+  line-height: 1.65;
+  text-align: left;
 }
 
-/* Le lien vers le portfolio. Souligné, parce qu'un lien qui ne se distingue
-   que par sa couleur n'est pas un lien pour qui ne voit pas cette couleur ;
-   le trait est écarté du texte et fin, pour rester discret. */
-.accueil-auteur {
+/* LE PIED DE PAGE : LES CRÉDITS.
+   Sous la grille, séparé d'un filet, en petit. On le trouve quand on le
+   cherche, il n'occupe pas la place de ce qu'on est venu voir. */
+.accueil-pied {
+  max-width: 60rem;
+  margin: clamp(2.5rem, 6vh, 4rem) auto 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.7;
+  text-align: center;
+}
+
+.accueil-pied p {
+  margin: 0;
+}
+
+/* Les liens du pied. Soulignés, parce qu'un lien qui ne se distingue que par
+   sa couleur n'est pas un lien pour qui ne voit pas cette couleur ; le trait
+   est écarté du texte et fin, pour rester discret. */
+.accueil-pied a {
   color: var(--text);
   font-weight: 550;
   text-decoration: underline;
@@ -1587,8 +1674,8 @@ body.sur-accueil > *:not(.accueil) { display: none !important; }
   transition: color 160ms ease, text-decoration-color 160ms ease;
 }
 
-.accueil-auteur:hover,
-.accueil-auteur:focus-visible {
+.accueil-pied a:hover,
+.accueil-pied a:focus-visible {
   color: var(--accent);
   text-decoration-color: currentColor;
 }

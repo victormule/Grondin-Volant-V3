@@ -684,32 +684,67 @@ const manifeste = {
   // « calcul N », et on remplace l'horaire de la prise de vue — identique par
   // construction — par la date du calcul et le nombre d'images qu'il a retenues.
   // C'est exactement ce qui change de l'une à l'autre.
-  sessions: publiees.map((c) => {
-    // Un maillage d'un autre procédé porte le nom qu'on lui a donné : il ne se
-    // numérote pas avec les captures, il n'en est pas une.
-    if (c.externe) {
-      return {
+  // UNE SESSION, ET CE QU'ELLE CONTIENT.
+  //
+  // Une session est une SÉANCE DEVANT L'OBJET. Ce qu'elle produit n'est pas
+  // forcément un seul modèle : dür.air peut recalculer une même prise avec un
+  // autre lot d'images, et le même passage peut avoir enregistré un nuage LiDAR
+  // en plus des photos. Ranger tout cela à plat, comme autant de « captures »,
+  // faisait passer trois calculs d'une seule séance pour trois séances — et
+  // laissait croire que la photogrammétrie et le LiDAR du muséum venaient de
+  // deux visites.
+  //
+  // Le tableau reste plat — les annotations désignent une entrée par son id, et
+  // le composite les empile toutes — mais chaque entrée dit à quelle session
+  // elle appartient. Le champ « groupe » porte le nom de la session ; les
+  // entrées qui le partagent sont ses ITÉRATIONS, et l'interface les présente
+  // sous elle. Sans « groupe », l'entrée est une session à elle seule : c'est
+  // le cas d'un objet dont chaque séance n'a produit qu'un modèle.
+  sessions: (() => {
+    const photogrammetriques = publiees.filter((p) => !p.externe);
+    const rangDe = (sid) => [...new Set(photogrammetriques.map((p) => p.sid))].indexOf(sid) + 1;
+    // La session de rattachement d'un procédé annexe est celle de la référence :
+    // le LiDAR a été relevé pendant la même séance, c'est même de là que vient
+    // la matrice qui le place.
+    const sessionDeReference = `Session ${rangDe(ref.sid)}`;
+    const externes = publiees.filter((p) => p.externe);
+
+    return publiees.map((c) => {
+      if (c.externe) {
+        return {
+          id: c.cle,
+          label: c.etiquette,
+          groupe: sessionDeReference,
+          date: dateFr(c.debut),
+          time: `${Math.round(c.sommets / 1000)} k sommets`,
+          glb: `sessions/${c.cle}/model.glb`,
+        };
+      }
+      const plusieurs = parCapture.get(c.sid) > 1;
+      const rangCapture = rangDe(c.sid);
+      const rangCalcul = photogrammetriques.filter((p) => p.sid === c.sid).indexOf(c) + 1;
+      // Une entrée est rangée sous sa session dès qu'elle y a de la compagnie :
+      // plusieurs calculs de la même prise, ou un procédé annexe relevé avec
+      // elle. Seule, elle EST la session et n'a pas de sous-partie.
+      const accompagnee = plusieurs || (externes.length > 0 && c.sid === ref.sid);
+      const entree = {
         id: c.cle,
-        label: c.etiquette,
-        date: dateFr(c.debut),
-        time: `${Math.round(c.sommets / 1000)} k sommets`,
+        label: plusieurs ? `Itération ${rangCalcul}`
+          : (accompagnee ? 'Photogrammétrie' : `Capture ${rangCapture}`),
+        date: dateFr(plusieurs ? (c.calcule ?? c.debut) : c.debut),
+        time: plusieurs
+          ? `${c.images ?? '?'} images`
+          : (c.debut && c.fin ? `${heureFr(c.debut)} – ${heureFr(c.fin)}` : heureFr(c.debut)),
         glb: `sessions/${c.cle}/model.glb`,
       };
-    }
-    const captures = publiees.filter((p) => !p.externe);
-    const plusieurs = parCapture.get(c.sid) > 1;
-    const rangCapture = [...new Set(captures.map((p) => p.sid))].indexOf(c.sid) + 1;
-    const rangCalcul = captures.filter((p) => p.sid === c.sid).indexOf(c) + 1;
-    return {
-      id: c.cle,
-      label: plusieurs ? `Capture ${rangCapture} · calcul ${rangCalcul}` : `Capture ${rangCapture}`,
-      date: dateFr(plusieurs ? (c.calcule ?? c.debut) : c.debut),
-      time: plusieurs
-        ? `${c.images ?? '?'} images`
-        : (c.debut && c.fin ? `${heureFr(c.debut)} – ${heureFr(c.fin)}` : heureFr(c.debut)),
-      glb: `sessions/${c.cle}/model.glb`,
-    };
-  }),
+      if (accompagnee) entree.groupe = `Session ${rangCapture}`;
+      // L'ordre des clés compte pour la lecture du fichier : le groupe juste
+      // après l'étiquette qu'il rassemble.
+      return accompagnee
+        ? { id: entree.id, label: entree.label, groupe: entree.groupe, date: entree.date, time: entree.time, glb: entree.glb }
+        : entree;
+    });
+  })(),
   reglages: {
     // Des distances tirées de la taille du modèle : un cadre de deux mètres et
     // un poisson de vingt centimètres ne se regardent pas de la même distance,

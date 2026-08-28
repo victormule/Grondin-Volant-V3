@@ -18,21 +18,24 @@
   "sessions": [
     {
       "id": "48F31E95-A0F2-4679-B10C-54736F8BDD4C-AA96D4B3",
-      "label": "Capture 1 · calcul 1",
+      "label": "Itération 1",
+      "groupe": "Session 1",
       "date": "26 août 2026",
       "time": "28 images",
       "glb": "sessions/48F31E95-A0F2-4679-B10C-54736F8BDD4C-AA96D4B3/model.glb"
     },
     {
       "id": "48F31E95-A0F2-4679-B10C-54736F8BDD4C-F4DFE0B5",
-      "label": "Capture 1 · calcul 2",
+      "label": "Itération 2",
+      "groupe": "Session 1",
       "date": "28 août 2026",
       "time": "28 images",
       "glb": "sessions/48F31E95-A0F2-4679-B10C-54736F8BDD4C-F4DFE0B5/model.glb"
     },
     {
       "id": "48F31E95-A0F2-4679-B10C-54736F8BDD4C-01288A78",
-      "label": "Capture 1 · calcul 3",
+      "label": "Itération 3",
+      "groupe": "Session 1",
       "date": "28 août 2026",
       "time": "18 images",
       "glb": "sessions/48F31E95-A0F2-4679-B10C-54736F8BDD4C-01288A78/model.glb"
