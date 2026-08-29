@@ -1,96 +1,171 @@
-// La page d'accueil : le catalogue, en vignettes.
-//
-// Le site sert plusieurs objets, et arriver directement dans l'un d'eux
-// obligeait à comprendre qu'il y en avait d'autres avant de pouvoir les
-// atteindre. On entre désormais par le catalogue : on voit ce qu'il y a, on
-// choisit, on entre. Revenir en arrière ramène ici.
-//
-// Aucune scène 3D n'est chargée tant qu'un objet n'a pas été choisi : l'accueil
-// est du texte et cinq JPEG. C'est amorce.js qui en décide — il n'importe
-// app.js, et à travers lui three.js, qu'une fois l'objet connu.
-//
-// LE CHOIX SE FAIT PAR L'URL, pas par un état interne. Chaque vignette est un
-// vrai lien vers ?objet=<id> : la page se recharge, ce qui garantit qu'aucun
-// atlas, aucune analyse de maillage et aucun brouillon de l'objet précédent ne
-// traîne — et donne gratuitement le bouton « précédent » du navigateur, qui
-// est le geste que tout le monde connaît déjà pour revenir en arrière.
+// Page d'accueil de Pygmalion. Elle reste volontairement autonome et légère :
+// aucun code 3D n'est chargé avant que le visiteur choisisse un objet.
+
+function lienExterne(href, classe) {
+  const lien = document.createElement('a');
+  lien.href = href;
+  lien.className = classe;
+  lien.target = '_blank';
+  lien.rel = 'noopener noreferrer';
+  return lien;
+}
+
+function creerIdentite() {
+  const identite = lienExterne(
+    'https://victor-mule.netlify.app/',
+    'accueil-identite',
+  );
+  identite.setAttribute('aria-label', 'Victor Mulé — Solution numérique pour le patrimoine');
+
+  const monogramme = document.createElement('span');
+  monogramme.className = 'accueil-monogramme';
+  monogramme.setAttribute('aria-hidden', 'true');
+  monogramme.textContent = 'VM';
+
+  const texte = document.createElement('span');
+  texte.className = 'accueil-identite-texte';
+  const nom = document.createElement('span');
+  nom.className = 'accueil-identite-nom';
+  nom.textContent = 'Victor Mulé';
+  const metier = document.createElement('span');
+  metier.className = 'accueil-identite-metier';
+  metier.textContent = 'Solution numérique pour le patrimoine';
+  texte.append(nom, metier);
+
+  identite.append(monogramme, texte);
+  return identite;
+}
+
+function creerAcquisition() {
+  const acquisition = lienExterne(
+    'https://durair.map.cnrs.fr/',
+    'accueil-acquisition',
+  );
+  acquisition.setAttribute(
+    'aria-label',
+    'Découvrir Dur.air, solution d’acquisition 3D du laboratoire MAP, CNRS',
+  );
+
+  const repere = document.createElement('span');
+  repere.className = 'accueil-acquisition-repere';
+  repere.textContent = 'Acquisition 3D';
+
+  const texte = document.createElement('span');
+  texte.className = 'accueil-acquisition-texte';
+  const nom = document.createElement('strong');
+  nom.textContent = 'Dur.air';
+  texte.append(nom, ' · Photogrammétrie & LiDAR · MAP (CNRS)');
+
+  const fleche = document.createElement('span');
+  fleche.className = 'accueil-acquisition-fleche';
+  fleche.setAttribute('aria-hidden', 'true');
+  fleche.textContent = '↗';
+
+  acquisition.append(repere, texte, fleche);
+  return acquisition;
+}
 
 export function afficherAccueil(hote, catalogue) {
   hote.replaceChildren();
 
-  // L'EN-TÊTE PORTE LE NOM DU SITE, PUIS CE QU'IL FAIT, PUIS POUR QUI.
-  //
-  // Trois lignes, dans cet ordre, parce qu'un visiteur qui arrive ici ne sait
-  // encore rien : le nom, la phrase qui le situe, et un paragraphe court écrit
-  // dans les mots du métier — constat d'état, transport, prêt, intervention.
-  // Personne n'a besoin qu'on lui dise qu'il est conservateur ou régisseur : le
-  // vocabulaire suffit à dire à qui la page s'adresse.
-  //
-  // Ce qui n'est PAS ici : le nom de l'auteur. Il descend au pied de page, avec
-  // le crédit d'acquisition — voir plus bas.
   const entete = document.createElement('header');
   entete.className = 'accueil-entete';
 
+  const navigation = document.createElement('div');
+  navigation.className = 'accueil-navigation';
+  const identite = creerIdentite();
+  const domaine = document.createElement('p');
+  domaine.className = 'accueil-domaine';
+  domaine.textContent = 'Conservation · Recherche · Collections';
+  navigation.append(identite, domaine);
+
+  const hero = document.createElement('div');
+  hero.className = 'accueil-hero';
+
+  const contenu = document.createElement('div');
+  contenu.className = 'accueil-hero-contenu';
+
+  const logo = document.createElement('img');
+  logo.className = 'accueil-logo';
+  logo.src = './logo.svg';
+  logo.alt = '';
+  logo.decoding = 'async';
+
+  const surtitre = document.createElement('p');
+  surtitre.className = 'accueil-surtitre';
+  surtitre.textContent = 'Plateforme de documentation 3D';
+
   const titre = document.createElement('h1');
   titre.className = 'accueil-titre';
-  titre.textContent = 'Galatée';
+  titre.textContent = 'Pygmalion';
 
   const signature = document.createElement('p');
   signature.className = 'accueil-signature';
-  signature.textContent = 'Visualisation et annotation 3D pour les collections de musée et le patrimoine';
+  signature.textContent = 'Observer, mesurer et documenter le patrimoine en trois dimensions.';
 
   const propos = document.createElement('p');
   propos.className = 'accueil-propos';
-  propos.textContent = 'Un constat d’état posé sur l’objet lui-même plutôt que sur une '
-    + 'photographie : le relevé se regarde sous tous les angles, se mesure — avec son '
-    + 'incertitude à côté du chiffre — et s’annote à l’endroit exact qui le demande. '
-    + 'Les relevés d’un même objet se superposent d’une date à l’autre : avant un '
-    + 'transport, après une intervention, au retour d’un prêt. Rien à installer, un lien suffit.';
+  propos.textContent = 'Les modèles 3D sont acquis avec Dur.air par photogrammétrie ou LiDAR, '
+    + 'puis observés, mesurés, annotés et comparés dans le temps.';
 
-  entete.append(titre, signature, propos);
+  contenu.append(logo, titre, surtitre, signature, propos, creerAcquisition());
+  hero.appendChild(contenu);
+  entete.append(navigation, hero);
 
-  // Le bandeau qui sépare l'identité du site de son contenu : l'étiquette d'un
-  // côté, le compte de l'autre, sur un filet.
-  const bandeau = document.createElement('div');
-  bandeau.className = 'accueil-bandeau';
+  const catalogueEntete = document.createElement('div');
+  catalogueEntete.className = 'accueil-bandeau';
+  const catalogueTitre = document.createElement('div');
   const invite = document.createElement('h2');
-  invite.className = 'panel-kicker accueil-invite';
-  invite.textContent = 'Choisir un objet';
+  invite.className = 'accueil-invite';
+  invite.textContent = 'Collection numérique';
+  const aide = document.createElement('p');
+  aide.className = 'accueil-aide';
+  aide.textContent = 'Sélectionnez un objet pour ouvrir son espace d’étude.';
+  catalogueTitre.append(invite, aide);
+
   const compte = document.createElement('span');
   compte.className = 'accueil-compte';
-  // Le compte ne nomme plus le procédé : tous les objets ne sont pas relevés
-  // de la même façon, et le muséum en porte deux à lui seul.
-  compte.textContent = catalogue.length > 1
-    ? `${catalogue.length} objets relevés`
-    : 'Un objet relevé';
-  bandeau.append(invite, compte);
+  compte.textContent = String(catalogue.length).padStart(2, '0');
+  const compteLibelle = document.createElement('span');
+  compteLibelle.textContent = catalogue.length > 1 ? ' objets documentés' : ' objet documenté';
+  compte.appendChild(compteLibelle);
+  catalogueEntete.append(catalogueTitre, compte);
 
   const grille = document.createElement('div');
   grille.className = 'accueil-grille';
 
-  for (const entree of catalogue) {
+  catalogue.forEach((entree, index) => {
     const carte = document.createElement('a');
     carte.className = 'accueil-carte';
     carte.href = `?objet=${encodeURIComponent(entree.id)}`;
+    carte.style.setProperty('--index-carte', index);
 
     const cadre = document.createElement('div');
     cadre.className = 'accueil-vignette';
     const image = document.createElement('img');
     image.src = `./objets/${entree.id}/vignette.jpg`;
-    // Le nom suffit à identifier la carte : décrire l'image une seconde fois
-    // ferait lire deux fois la même chose à un lecteur d'écran.
     image.alt = '';
-    image.loading = 'lazy';
-    // Une vignette manquante ne doit pas laisser l'icône d'image cassée du
-    // navigateur : la carte reste utilisable, avec son nom et sa description.
+    image.loading = index < 3 ? 'eager' : 'lazy';
+    image.decoding = 'async';
     image.addEventListener('error', () => { cadre.hidden = true; });
-    cadre.appendChild(image);
 
+    const numero = document.createElement('span');
+    numero.className = 'accueil-numero';
+    numero.textContent = String(index + 1).padStart(2, '0');
+    cadre.append(image, numero);
+
+    const corps = document.createElement('span');
+    corps.className = 'accueil-carte-corps';
     const nom = document.createElement('span');
     nom.className = 'accueil-nom';
     nom.textContent = entree.nom ?? entree.id;
+    const fleche = document.createElement('span');
+    fleche.className = 'accueil-carte-fleche';
+    fleche.setAttribute('aria-hidden', 'true');
+    fleche.textContent = '↗';
+    corps.append(nom, fleche);
 
-    carte.append(cadre, nom);
+    carte.append(cadre, corps);
     if (entree.detail) {
       const detail = document.createElement('span');
       detail.className = 'accueil-detail';
@@ -98,43 +173,17 @@ export function afficherAccueil(hote, catalogue) {
       carte.appendChild(detail);
     }
     grille.appendChild(carte);
-  }
+  });
 
-  // LE PIED DE PAGE : QUI A FAIT QUOI.
-  //
-  // Deux lignes, et l'ordre n'est pas indifférent. Les relevés viennent de
-  // dür.air, l'application de photogrammétrie du laboratoire MAP (CNRS) : sans
-  // lui il n'y aurait rien à montrer, et le dire est simplement exact. La
-  // seconde ligne dit ce que l'auteur de ce site a fait — le site — et rien de
-  // plus. Elles sont en bas parce que c'est là qu'on cherche un crédit, et
-  // parce qu'une page qui présente des objets ne commence pas par présenter
-  // celui qui l'a écrite.
   const pied = document.createElement('footer');
   pied.className = 'accueil-pied';
+  const credit = document.createElement('p');
+  credit.textContent = 'Pygmalion · Documentation scientifique du patrimoine en 3D';
+  const technique = document.createElement('p');
+  technique.append('Conception et développement — ', creerIdentite());
+  pied.append(credit, technique);
 
-  const acquisition = document.createElement('p');
-  const durair = document.createElement('a');
-  durair.href = 'https://durair.map.cnrs.fr/';
-  durair.target = '_blank';
-  durair.rel = 'noopener noreferrer';
-  durair.textContent = 'dür.air';
-  acquisition.append('Acquisitions photogrammétriques et LiDAR réalisées avec ', durair,
-    ', développé par le laboratoire MAP (CNRS).');
-
-  const application = document.createElement('p');
-  const auteur = document.createElement('a');
-  auteur.href = 'https://victor-mule.netlify.app/';
-  // Le portfolio est un autre site : l'ouvrir à côté plutôt qu'à la place de
-  // celui-ci, pour ne pas faire perdre le catalogue qu'on était en train de
-  // parcourir. « noopener » coupe l'accès de la page ouverte à celle-ci.
-  auteur.target = '_blank';
-  auteur.rel = 'noopener noreferrer';
-  auteur.textContent = 'Victor Mulé';
-  application.append('Galatée est conçu et développé par ', auteur, '.');
-
-  pied.append(acquisition, application);
-
-  hote.append(entete, bandeau, grille, pied);
+  hote.append(entete, catalogueEntete, grille, pied);
   hote.hidden = false;
   document.body.classList.add('sur-accueil');
 }

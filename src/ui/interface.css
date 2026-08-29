@@ -1591,12 +1591,40 @@ body:has(.panneau-calques.collapsed) .barre-outils {
    décor du visualiseur, présent dans le HTML mais inerte. */
 
 .accueil {
+  --accueil-accent: #b8583e;
+  --accueil-accent-vif: #cf694d;
+  --accueil-papier: #efeee9;
+  --accueil-encre: #202522;
+  --accueil-secondaire: #6c6c65;
+  --accueil-filet: rgba(32, 37, 34, 0.16);
   position: fixed;
   inset: 0;
   z-index: 40;
   overflow-y: auto;
-  padding: clamp(2rem, 7vh, 5rem) clamp(1.25rem, 5vw, 4rem);
-  background: var(--background);
+  padding: 0 clamp(1.25rem, 5vw, 5.5rem);
+  background:
+    radial-gradient(circle at 82% 13%, rgba(184, 88, 62, 0.09), transparent 24rem),
+    linear-gradient(110deg, rgba(255, 255, 255, 0.38), transparent 34%),
+    var(--accueil-papier);
+  color: var(--accueil-encre);
+  scrollbar-color: var(--accueil-filet) transparent;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+@media (prefers-color-scheme: dark) {
+  .accueil {
+    --accueil-accent: #d2765d;
+    --accueil-accent-vif: #e58b71;
+    --accueil-papier: #181b19;
+    --accueil-encre: #f0eee8;
+    --accueil-secondaire: #aaa9a2;
+    --accueil-filet: rgba(240, 238, 232, 0.16);
+    background:
+      radial-gradient(circle at 82% 13%, rgba(210, 118, 93, 0.12), transparent 24rem),
+      linear-gradient(110deg, rgba(255, 255, 255, 0.018), transparent 34%),
+      var(--accueil-papier);
+  }
 }
 
 /* Le visualiseur est écrit dans la page mais n'a rien à y faire tant qu'on
@@ -1607,168 +1635,1215 @@ body.sur-accueil > *:not(.accueil) { display: none !important; }
    page qui n'a rien au-dessus d'elle, et une identité posée au milieu d'une
    grille elle-même centrée se lit comme une page de titre plutôt que comme un
    panneau de réglages. */
+.accueil-entete,
+.accueil-bandeau,
+.accueil-grille,
+.accueil-pied {
+  width: 100%;
+  max-width: 76rem;
+  margin-inline: auto;
+}
+
 .accueil-entete {
-  max-width: 60rem;
-  margin: 0 auto clamp(1.75rem, 4.5vh, 2.75rem);
-  text-align: center;
-}
-
-.accueil-titre {
-  margin: 0 0 0.55rem;
-  font-size: clamp(2.1rem, 6vw, 3.15rem);
-  font-weight: 600;
-  /* Serré : à cette taille l'approche par défaut fait flotter les lettres. */
-  letter-spacing: -0.028em;
-  line-height: 1.05;
-}
-
-.accueil-signature {
-  margin: 0 auto;
-  max-width: 44rem;
-  color: var(--muted);
-  font-size: clamp(0.86rem, 1.6vw, 0.98rem);
-  font-weight: 450;
-  letter-spacing: 0.004em;
-}
-
-/* Le paragraphe qui dit à quoi sert le site. Étroit — quarante-cinq caractères
-   par ligne environ — parce qu'un texte centré devient illisible dès qu'il
-   s'étale : l'œil perd le début de la ligne suivante. */
-.accueil-propos {
-  max-width: 42rem;
-  margin: 1.15rem auto 0;
-  color: var(--muted);
-  font-size: clamp(0.84rem, 1.5vw, 0.94rem);
-  line-height: 1.65;
   text-align: left;
 }
 
-/* LE PIED DE PAGE : LES CRÉDITS.
-   Sous la grille, séparé d'un filet, en petit. On le trouve quand on le
-   cherche, il n'occupe pas la place de ce qu'on est venu voir. */
-.accueil-pied {
-  max-width: 60rem;
-  margin: clamp(2.5rem, 6vh, 4rem) auto 0;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 0.76rem;
-  line-height: 1.7;
-  text-align: center;
+.accueil-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 6rem;
+  border-bottom: 1px solid var(--accueil-filet);
 }
 
-.accueil-pied p {
+.accueil-identite {
+  display: inline-flex;
+  gap: 0.8rem;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.accueil-monogramme {
+  display: grid;
+  width: 2.65rem;
+  height: 2.65rem;
+  place-items: center;
+  border: 1px solid var(--accueil-accent);
+  color: var(--accueil-accent);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.86rem;
+  letter-spacing: -0.04em;
+  transition: background 180ms ease, color 180ms ease;
+}
+
+.accueil-identite:hover .accueil-monogramme,
+.accueil-identite:focus-visible .accueil-monogramme {
+  background: var(--accueil-accent);
+  color: var(--accueil-papier);
+}
+
+.accueil-identite-texte {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.accueil-identite-nom {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+  letter-spacing: 0.035em;
+  line-height: 1;
+}
+
+.accueil-identite-metier,
+.accueil-domaine {
+  color: var(--accueil-secondaire);
+  font-size: 0.61rem;
+  font-weight: 540;
+  letter-spacing: 0.18em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.accueil-domaine {
   margin: 0;
+  letter-spacing: 0.14em;
 }
 
-/* Les liens du pied. Soulignés, parce qu'un lien qui ne se distingue que par
-   sa couleur n'est pas un lien pour qui ne voit pas cette couleur ; le trait
-   est écarté du texte et fin, pour rester discret. */
-.accueil-pied a {
-  color: var(--text);
-  font-weight: 550;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-decoration-color: color-mix(in srgb, var(--text) 32%, transparent);
-  text-underline-offset: 0.22em;
-  transition: color 160ms ease, text-decoration-color 160ms ease;
+.accueil-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.55fr);
+  min-height: clamp(31rem, 67vh, 42rem);
+  border-bottom: 1px solid var(--accueil-filet);
 }
 
-.accueil-pied a:hover,
-.accueil-pied a:focus-visible {
-  color: var(--accent);
-  text-decoration-color: currentColor;
+.accueil-hero-contenu {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(4.25rem, 8vw, 7rem) clamp(2.5rem, 6vw, 6.5rem) clamp(4rem, 7vw, 6rem) 0;
 }
 
-/* Le filet entre l'identité du site et son catalogue. */
+.accueil-surtitre {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  margin: 0 0 1.2rem;
+  color: var(--accueil-accent);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.accueil-surtitre::before {
+  width: 2.5rem;
+  height: 1px;
+  background: currentColor;
+  content: '';
+}
+
+.accueil-titre {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(4.35rem, 10.5vw, 8.1rem);
+  font-weight: 400;
+  letter-spacing: -0.065em;
+  line-height: 0.86;
+}
+
+.accueil-signature {
+  max-width: 40rem;
+  margin: clamp(2rem, 4vw, 3.25rem) 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.3rem, 2.4vw, 1.78rem);
+  line-height: 1.28;
+}
+
+.accueil-propos {
+  max-width: 39rem;
+  margin: 1.15rem 0 0;
+  color: var(--accueil-secondaire);
+  font-size: clamp(0.9rem, 1.3vw, 1rem);
+  line-height: 1.65;
+}
+
+.accueil-acquisition {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  max-width: 41rem;
+  margin-top: clamp(1.8rem, 4vw, 2.7rem);
+  padding: 1rem 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--accueil-accent) 48%, transparent);
+  background: color-mix(in srgb, var(--accueil-accent) 5%, transparent);
+  color: inherit;
+  text-decoration: none;
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.accueil-acquisition:hover,
+.accueil-acquisition:focus-visible {
+  border-color: var(--accueil-accent);
+  background: color-mix(in srgb, var(--accueil-accent) 10%, transparent);
+  transform: translateY(-2px);
+}
+
+.accueil-acquisition-repere {
+  padding-right: 1rem;
+  border-right: 1px solid var(--accueil-filet);
+  color: var(--accueil-accent);
+  font-size: 0.61rem;
+  font-weight: 680;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.accueil-acquisition-texte {
+  color: var(--accueil-secondaire);
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+}
+
+.accueil-acquisition-texte strong {
+  color: var(--accueil-encre);
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.accueil-acquisition-fleche {
+  color: var(--accueil-accent);
+  font-size: 1.05rem;
+  transition: transform 180ms ease;
+}
+
+.accueil-acquisition:hover .accueil-acquisition-fleche,
+.accueil-acquisition:focus-visible .accueil-acquisition-fleche {
+  transform: translate(0.15rem, -0.15rem);
+}
+
+.accueil-figure {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  min-height: 100%;
+  place-items: center;
+  border-left: 1px solid var(--accueil-filet);
+  background:
+    linear-gradient(var(--accueil-filet) 1px, transparent 1px),
+    linear-gradient(90deg, var(--accueil-filet) 1px, transparent 1px),
+    color-mix(in srgb, var(--accueil-accent) 3%, transparent);
+  background-position: center;
+  background-size: 4rem 4rem;
+}
+
+.accueil-figure::after {
+  position: absolute;
+  width: 75%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--accueil-papier);
+  box-shadow: 0 0 5rem 2rem var(--accueil-papier);
+  content: '';
+}
+
+.accueil-figure-repere {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.2rem;
+  z-index: 2;
+  color: var(--accueil-accent);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.61rem;
+  letter-spacing: 0.12em;
+}
+
+.accueil-orbite {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: min(19vw, 15rem);
+  min-width: 11rem;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accueil-accent) 65%, transparent);
+  border-radius: 50%;
+  transform: rotate(-10deg);
+}
+
+.accueil-orbite::before,
+.accueil-orbite::after {
+  position: absolute;
+  border: 1px solid color-mix(in srgb, var(--accueil-accent) 42%, transparent);
+  border-radius: 50%;
+  content: '';
+}
+
+.accueil-orbite::before {
+  inset: 16% -8%;
+  transform: rotate(58deg);
+}
+
+.accueil-orbite::after {
+  inset: -8% 16%;
+  transform: rotate(-48deg);
+}
+
+.accueil-axe {
+  position: absolute;
+  z-index: -1;
+  background: color-mix(in srgb, var(--accueil-accent) 35%, transparent);
+}
+
+.accueil-axe-vertical {
+  width: 1px;
+  height: 145%;
+}
+
+.accueil-axe-horizontal {
+  width: 145%;
+  height: 1px;
+}
+
+.accueil-figure-lettre {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(5rem, 9vw, 8.5rem);
+  color: var(--accueil-accent);
+  line-height: 1;
+  transform: rotate(10deg) translateY(-0.04em);
+}
+
+.accueil-figure-point {
+  position: absolute;
+  top: 9%;
+  right: 18%;
+  width: 0.55rem;
+  aspect-ratio: 1;
+  border: 2px solid var(--accueil-papier);
+  border-radius: 50%;
+  background: var(--accueil-accent-vif);
+  box-shadow: 0 0 0 1px var(--accueil-accent);
+}
+
+.accueil-figure-legende {
+  position: absolute;
+  right: 1.15rem;
+  bottom: 1.1rem;
+  z-index: 2;
+  margin: 0;
+  color: var(--accueil-secondaire);
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  line-height: 1.7;
+  text-align: right;
+}
+
 .accueil-bandeau {
   display: flex;
-  gap: 1rem;
-  align-items: baseline;
+  gap: 2rem;
+  align-items: end;
   justify-content: space-between;
-  max-width: 60rem;
-  margin: 0 auto clamp(0.9rem, 2.5vh, 1.35rem);
-  padding-bottom: 0.55rem;
-  border-bottom: 1px solid var(--border);
+  margin-top: clamp(3.5rem, 7vw, 6rem);
+  margin-bottom: 1.35rem;
+  padding-bottom: 1.2rem;
+  border-bottom: 1px solid var(--accueil-filet);
 }
 
 .accueil-invite {
   margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+
+.accueil-aide {
+  margin: 0.45rem 0 0;
+  color: var(--accueil-secondaire);
+  font-size: 0.78rem;
 }
 
 .accueil-compte {
-  color: var(--muted);
-  font-size: 0.78rem;
-  text-align: right;
+  color: var(--accueil-accent);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.5rem;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-/* Sous cette largeur les deux bouts du bandeau se disputent la ligne : le
-   compte passe dessous plutôt que de se couper en deux. */
-@media (max-width: 30rem) {
-  .accueil-bandeau {
-    flex-direction: column;
-    gap: 0.3rem;
-    align-items: flex-start;
-  }
-
-  .accueil-compte { text-align: left; }
+.accueil-compte span {
+  color: var(--accueil-secondaire);
+  font-family: Inter, Aptos, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.62rem;
+  font-weight: 560;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
 }
 
 .accueil-grille {
   display: grid;
-  gap: clamp(1rem, 2.5vw, 1.75rem);
-  /* Des cartes qui se rangent d'elles-mêmes : trois de front sur un écran
-     large, une sur un téléphone, sans point de rupture à écrire. */
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  max-width: 60rem;
-  margin: 0 auto;
+  gap: clamp(1.5rem, 3vw, 2.5rem) clamp(1rem, 2vw, 1.6rem);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .accueil-carte {
   display: flex;
+  min-width: 0;
   flex-direction: column;
-  gap: 0.15rem;
-  padding: 0.65rem 0.65rem 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: 0.9rem;
-  background: var(--panel);
   color: inherit;
   text-decoration: none;
-  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+  animation: accueil-apparition 480ms both;
+  animation-delay: calc(var(--index-carte) * 55ms);
+}
+
+.accueil-vignette {
+  position: relative;
+  margin-bottom: 0.95rem;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  background: color-mix(in srgb, var(--accueil-encre) 7%, transparent);
+}
+
+.accueil-vignette::after {
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, var(--accueil-encre) 9%, transparent);
+  content: '';
+  pointer-events: none;
+}
+
+.accueil-vignette img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.88) contrast(1.02);
+  transition: filter 420ms ease, transform 520ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.accueil-numero {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  min-width: 2rem;
+  padding: 0.35rem 0.42rem;
+  background: color-mix(in srgb, var(--accueil-papier) 88%, transparent);
+  color: var(--accueil-encre);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.61rem;
+  letter-spacing: 0.08em;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+
+.accueil-carte-corps {
+  display: flex;
+  gap: 1rem;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.accueil-nom {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.03rem, 1.7vw, 1.24rem);
+  line-height: 1.25;
+}
+
+.accueil-carte-fleche {
+  color: var(--accueil-accent);
+  font-size: 1rem;
+  transition: transform 180ms ease;
+}
+
+.accueil-detail {
+  max-width: 95%;
+  margin-top: 0.42rem;
+  color: var(--accueil-secondaire);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.accueil-carte:hover .accueil-vignette img,
+.accueil-carte:focus-visible .accueil-vignette img {
+  filter: saturate(1) contrast(1.04);
+  transform: scale(1.035);
+}
+
+.accueil-carte:hover .accueil-carte-fleche,
+.accueil-carte:focus-visible .accueil-carte-fleche {
+  transform: translate(0.16rem, -0.16rem);
+}
+
+.accueil-pied {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: clamp(4rem, 8vw, 7rem);
+  padding: 1.5rem 0 2.5rem;
+  border-top: 1px solid var(--accueil-filet);
+  color: var(--accueil-secondaire);
+  font-size: 0.68rem;
+}
+
+.accueil-pied p {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 0;
+}
+
+.accueil-pied .accueil-identite {
+  gap: 0.55rem;
+}
+
+.accueil-pied .accueil-monogramme {
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.66rem;
+}
+
+.accueil-pied .accueil-identite-nom {
+  font-size: 0.82rem;
+}
+
+.accueil-pied .accueil-identite-metier {
+  display: none;
+}
+
+@keyframes accueil-apparition {
+  from { opacity: 0; transform: translateY(0.7rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 52rem) {
+  .accueil-hero {
+    grid-template-columns: minmax(0, 1fr) 13rem;
+  }
+
+  .accueil-hero-contenu {
+    padding-right: 2.5rem;
+  }
+
+  .accueil-orbite {
+    min-width: 8.5rem;
+  }
+
+  .accueil-grille {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 40rem) {
+  .accueil-navigation {
+    min-height: 5rem;
+  }
+
+  .accueil-domaine,
+  .accueil-figure {
+    display: none;
+  }
+
+  .accueil-hero {
+    display: block;
+    min-height: 0;
+  }
+
+  .accueil-hero-contenu {
+    padding: 4.5rem 0 4rem;
+  }
+
+  .accueil-titre {
+    font-size: clamp(3.8rem, 19vw, 5.5rem);
+  }
+
+  .accueil-acquisition {
+    grid-template-columns: 1fr auto;
+  }
+
+  .accueil-acquisition-repere {
+    grid-column: 1 / -1;
+    padding: 0 0 0.65rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--accueil-filet);
+  }
+
+  .accueil-bandeau {
+    align-items: start;
+  }
+
+  .accueil-compte span {
+    display: none;
+  }
+
+  .accueil-pied {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 30rem) {
+  .accueil-identite-metier {
+    max-width: 14rem;
+    letter-spacing: 0.12em;
+  }
+
+  .accueil-grille {
+    grid-template-columns: 1fr;
+  }
+
+  .accueil-compte {
+    font-size: 2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accueil-carte {
+    animation: none;
+  }
+
+  .accueil-carte *,
+  .accueil-acquisition,
+  .accueil-identite * {
+    transition: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   ACCUEIL / ATELIER
+
+   L'accueil reprend ici la matière du visualiseur : fond minéral, panneaux
+   translucides, ombres très diffuses, angles généreux et micro-typographie
+   turquoise. Il doit donner l'impression que l'atelier est déjà ouvert. */
+
+.accueil {
+  --accueil-accent: var(--accent);
+  --accueil-accent-doux: var(--accent-doux);
+  --accueil-papier: var(--background);
+  --accueil-encre: var(--text);
+  --accueil-secondaire: var(--muted);
+  --accueil-filet: var(--border);
+  padding: 0 clamp(0.75rem, 2.5vw, 2.5rem);
+  background:
+    radial-gradient(circle at 16% 5%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 27rem),
+    radial-gradient(circle at 88% 28%, rgba(255, 255, 255, 0.58), transparent 32rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--background) 93%, white), var(--background));
+}
+
+.accueil-entete,
+.accueil-bandeau,
+.accueil-grille,
+.accueil-pied {
+  max-width: 86rem;
+}
+
+.accueil-navigation {
+  min-height: 5.2rem;
+  margin-top: 0;
+  padding: 0 0.2rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.accueil-identite {
+  gap: 0.7rem;
+}
+
+.accueil-monogramme {
+  width: 2.55rem;
+  height: 2.55rem;
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--border));
+  border-radius: 0.72rem;
+  background: var(--accent-doux);
+  color: var(--accent);
+  font-family: Inter, Aptos, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.accueil-identite:hover .accueil-monogramme,
+.accueil-identite:focus-visible .accueil-monogramme {
+  background: var(--accent);
+  color: var(--button-text);
+}
+
+.accueil-identite-nom {
+  font-family: Inter, Aptos, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.86rem;
+  font-weight: 670;
+  letter-spacing: -0.012em;
+}
+
+.accueil-identite-metier,
+.accueil-domaine {
+  color: var(--muted);
+  font-size: 0.55rem;
+  font-weight: 620;
+  letter-spacing: 0.14em;
+}
+
+.accueil-domaine {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.accueil-hero {
+  display: block;
+  max-width: 86rem;
+  min-height: 0;
+  margin: 0 auto;
+  border: 0;
+}
+
+.accueil-hero-contenu {
+  position: relative;
+  align-items: center;
+  min-height: 0;
+  padding: clamp(1.5rem, 2.3vw, 2.15rem) clamp(1.5rem, 3.5vw, 3.2rem);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1.35rem;
+  background:
+    radial-gradient(circle at 90% 10%, var(--accent-doux), transparent 18rem),
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--panel-fort) 78%, transparent),
+      var(--panel));
+  box-shadow: var(--ombre-panneau);
+  text-align: center;
+  backdrop-filter: blur(24px) saturate(1.12);
+  -webkit-backdrop-filter: blur(24px) saturate(1.12);
+}
+
+.accueil-hero-contenu::after {
+  display: none;
+}
+
+.accueil-logo {
+  position: static;
+  width: auto;
+  height: clamp(6rem, 8vw, 7rem);
+  margin: 0 0 0.35rem;
+  opacity: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 0.65rem 1.2rem rgba(20, 33, 31, 0.08));
+}
+
+.accueil-surtitre {
+  display: block;
+  margin: 0.9rem 0 0;
+  color: var(--text);
+  font-size: clamp(0.57rem, 0.95vw, 0.7rem);
+  font-weight: 520;
+  letter-spacing: 0.25em;
+  text-align: center;
+}
+
+.accueil-surtitre::before {
+  display: block;
+  width: 3.8rem;
+  height: 2px;
+  margin: 0 auto 0.7rem;
+  border-radius: 0;
+  background: #b13b1d;
+  box-shadow: none;
+}
+
+.accueil-titre {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(3.6rem, 6vw, 5rem);
+  font-weight: 400;
+  letter-spacing: -0.06em;
+  line-height: 0.86;
+}
+
+.accueil-signature {
+  max-width: 46rem;
+  margin: clamp(1rem, 1.7vw, 1.3rem) auto 0;
+  font-family: Inter, Aptos, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.05rem, 1.65vw, 1.3rem);
+  font-weight: 580;
+  letter-spacing: -0.025em;
+  line-height: 1.35;
+}
+
+.accueil-propos {
+  max-width: 48rem;
+  margin: 0.5rem auto 0;
+  font-size: clamp(0.8rem, 1.2vw, 0.9rem);
+  line-height: 1.5;
+}
+
+.accueil-acquisition {
+  max-width: 36rem;
+  margin: clamp(0.85rem, 1.5vw, 1.1rem) auto 0;
+  padding: 0.64rem 0.8rem;
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+  border-radius: 0.82rem;
+  background: var(--accent-doux);
+  box-shadow: 0 1px 1px rgba(20, 33, 31, 0.035);
+}
+
+.accueil-acquisition:hover,
+.accueil-acquisition:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--border));
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: 0 0.7rem 1.7rem color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.accueil-acquisition-repere {
+  padding-right: 0.9rem;
+  border-color: var(--border);
+  color: var(--accent);
+  font-size: 0.56rem;
+  letter-spacing: 0.13em;
+}
+
+.accueil-acquisition-texte {
+  color: var(--muted);
+  font-size: 0.69rem;
+}
+
+.accueil-acquisition-texte strong {
+  color: var(--text);
+  font-size: 0.76rem;
+}
+
+.accueil-acquisition-fleche {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 0.55rem;
+  background: var(--accent);
+  color: var(--button-text);
+  font-size: 0.8rem;
+}
+
+.accueil-figure {
+  position: relative;
+  display: block;
+  min-height: clamp(31rem, 66vh, 40rem);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  border-radius: 1.35rem;
+  background: #171a18;
+  box-shadow: var(--ombre-panneau);
+}
+
+.accueil-figure::after {
+  display: none;
+}
+
+.accueil-figure::before {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background:
+    linear-gradient(180deg, rgba(10, 14, 13, 0.42), transparent 24%, transparent 62%, rgba(10, 14, 13, 0.72)),
+    radial-gradient(circle at 52% 48%, transparent 34%, rgba(7, 10, 9, 0.28));
+  content: '';
+  pointer-events: none;
+}
+
+.accueil-figure-vue {
+  position: absolute;
+  inset: 0;
+}
+
+.accueil-figure-modele {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.88) contrast(1.03);
+  transform: scale(1.04);
+}
+
+.accueil-figure-repere,
+.accueil-figure-statut,
+.accueil-figure-outil,
+.accueil-figure-legende {
+  position: absolute;
+  z-index: 3;
+}
+
+.accueil-figure-repere {
+  top: 1rem;
+  right: 1rem;
+  padding: 0.44rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.56rem;
+  background: rgba(248, 250, 248, 0.76);
+  color: #4f5b58;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  backdrop-filter: blur(12px);
+}
+
+.accueil-figure-statut {
+  top: 1rem;
+  left: 1rem;
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.48rem 0.66rem;
+  border: 1px solid rgba(90, 196, 183, 0.26);
+  border-radius: 0.58rem;
+  background: rgba(249, 252, 250, 0.82);
+  color: #176b65;
+  font-size: 0.59rem;
+  font-weight: 650;
+  backdrop-filter: blur(12px);
+}
+
+.accueil-figure-statut::before {
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 50%;
+  background: #28a397;
+  box-shadow: 0 0 0 0.2rem rgba(40, 163, 151, 0.16);
+  content: '';
+}
+
+.accueil-figure-outil {
+  display: flex;
+  gap: 0.38rem;
+  align-items: center;
+  padding: 0.4rem 0.58rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0.55rem;
+  background: rgba(249, 252, 250, 0.82);
+  box-shadow: 0 0.5rem 1.3rem rgba(0, 0, 0, 0.2);
+  color: #26312f;
+  font-size: 0.57rem;
+  font-weight: 620;
+  backdrop-filter: blur(12px);
+}
+
+.accueil-figure-outil::before {
+  width: 0.42rem;
+  height: 0.42rem;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #1f958b;
+  box-shadow: 0 0 0 1px #1f958b;
+  content: '';
+}
+
+.accueil-figure-outil-1 {
+  top: 31%;
+  left: 6%;
+}
+
+.accueil-figure-outil-2 {
+  top: 48%;
+  right: 5%;
+}
+
+.accueil-figure-outil-2::before {
+  background: #d9952f;
+  box-shadow: 0 0 0 1px #d9952f;
+}
+
+.accueil-figure-outil-3 {
+  top: 66%;
+  left: 12%;
+}
+
+.accueil-figure-outil-3::before {
+  background: #4d82bb;
+  box-shadow: 0 0 0 1px #4d82bb;
+}
+
+.accueil-figure-legende {
+  right: auto;
+  bottom: 1.25rem;
+  left: 1.25rem;
+  margin: 0;
+  color: rgba(238, 244, 241, 0.66);
+  font-size: 0.58rem;
+  font-weight: 540;
+  letter-spacing: 0.035em;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.accueil-figure-legende strong {
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.accueil-bandeau {
+  align-items: center;
+  margin-top: clamp(3.5rem, 7vw, 5.5rem);
+  margin-bottom: 1rem;
+  padding: 0;
+  border: 0;
+}
+
+.accueil-invite {
+  font-family: Inter, Aptos, ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+
+.accueil-invite::before {
+  display: block;
+  margin-bottom: 0.38rem;
+  color: var(--accent);
+  font-size: 0.57rem;
+  font-weight: 680;
+  letter-spacing: 0.14em;
+  content: 'CATALOGUE 3D';
+}
+
+.accueil-aide {
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+}
+
+.accueil-compte {
+  display: flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  padding: 0.62rem 0.78rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--panel);
+  box-shadow: 0 0.5rem 1.4rem rgba(20, 33, 31, 0.07);
+  color: var(--accent);
+  font-family: Inter, Aptos, ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.accueil-compte span {
+  font-size: 0.54rem;
+  letter-spacing: 0.1em;
+}
+
+.accueil-grille {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.accueil-carte {
+  grid-column: span 4;
+  padding: 0.55rem 0.55rem 0.8rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1.15rem;
+  background: linear-gradient(145deg,
+    color-mix(in srgb, var(--panel-fort) 70%, transparent),
+    var(--panel));
+  box-shadow: 0 0.75rem 2rem rgba(20, 33, 31, 0.08);
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+  transition: transform 220ms cubic-bezier(0.22, 0.72, 0.2, 1),
+    border-color 180ms ease, box-shadow 220ms ease;
+}
+
+.accueil-carte:nth-child(1),
+.accueil-carte:nth-child(6) {
+  grid-column: span 5;
+}
+
+.accueil-carte:nth-child(2),
+.accueil-carte:nth-child(4) {
+  grid-column: span 3;
 }
 
 .accueil-carte:hover,
 .accueil-carte:focus-visible {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  box-shadow: 0 0.6rem 1.6rem color-mix(in srgb, var(--text) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  box-shadow: 0 1.15rem 2.8rem rgba(20, 33, 31, 0.14);
+  transform: translateY(-0.24rem);
 }
 
 .accueil-vignette {
-  margin-bottom: 0.6rem;
-  overflow: hidden;
-  border-radius: 0.55rem;
-  /* Un rapport fixe : les vignettes sont carrées, et une hauteur imposée évite
-     que la grille ne se réarrange pendant leur chargement. */
-  aspect-ratio: 1;
-  background: color-mix(in srgb, var(--text) 6%, transparent);
+  height: clamp(12.5rem, 19vw, 16rem);
+  margin-bottom: 0.78rem;
+  border-radius: 0.8rem;
+  aspect-ratio: auto;
+}
+
+.accueil-vignette::after {
+  border-color: rgba(255, 255, 255, 0.07);
+  border-radius: inherit;
 }
 
 .accueil-vignette img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
+  filter: saturate(0.82) contrast(1.03);
+}
+
+.accueil-numero {
+  top: 0.65rem;
+  left: 0.65rem;
+  min-width: 1.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.52rem;
+  background: rgba(249, 251, 249, 0.78);
+  color: #3c4744;
+}
+
+.accueil-carte-corps {
+  padding-inline: 0.22rem;
 }
 
 .accueil-nom {
-  font-size: 1rem;
-  font-weight: 600;
+  font-family: Inter, Aptos, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.88rem;
+  font-weight: 670;
+  letter-spacing: -0.018em;
+}
+
+.accueil-carte-fleche {
+  display: grid;
+  width: 1.65rem;
+  height: 1.65rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.52rem;
+  background: var(--accent-doux);
+  color: var(--accent);
+  font-size: 0.72rem;
 }
 
 .accueil-detail {
+  margin-top: 0.3rem;
+  padding-inline: 0.22rem;
+  font-size: 0.66rem;
+}
+
+.accueil-pied {
+  margin-top: clamp(3.5rem, 7vw, 5rem);
+  padding: 1rem 0 2rem;
+  border-color: var(--border);
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.63rem;
+}
+
+.accueil-pied .accueil-monogramme {
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
+.accueil-pied .accueil-identite-nom {
+  font-size: 0.74rem;
+}
+
+@media (max-width: 64rem) {
+  .accueil-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.82fr);
+  }
+
+  .accueil-hero-contenu {
+    padding: clamp(2.5rem, 5vw, 4rem);
+  }
+
+  .accueil-carte,
+  .accueil-carte:nth-child(n) {
+    grid-column: span 6;
+  }
+}
+
+@media (max-width: 46rem) {
+  .accueil-navigation {
+    min-height: 4.6rem;
+    margin-top: 0.65rem;
+  }
+
+  .accueil-domaine {
+    display: none;
+  }
+
+  .accueil-hero {
+    grid-template-columns: 1fr;
+    margin-top: 0.65rem;
+  }
+
+  .accueil-hero-contenu,
+  .accueil-figure {
+    min-height: 0;
+  }
+
+  .accueil-hero-contenu {
+    padding: 1.6rem 1.45rem;
+  }
+
+  .accueil-logo {
+    position: static;
+    height: 6.2rem;
+    margin: 0 0 0.4rem;
+  }
+
+  .accueil-figure {
+    display: block;
+    height: min(94vw, 27rem);
+  }
+
+  .accueil-titre {
+    font-size: clamp(3.35rem, 15vw, 4.5rem);
+  }
+
+  .accueil-acquisition {
+    grid-template-columns: 1fr auto;
+  }
+
+  .accueil-acquisition-repere {
+    grid-column: 1 / -1;
+    padding: 0 0 0.65rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .accueil-bandeau {
+    align-items: flex-end;
+  }
+
+  .accueil-grille {
+    grid-template-columns: 1fr;
+  }
+
+  .accueil-carte,
+  .accueil-carte:nth-child(n) {
+    grid-column: 1;
+  }
+
+  .accueil-vignette {
+    height: min(72vw, 18rem);
+  }
+
+  .accueil-pied {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 25rem) {
+  .accueil-identite-metier {
+    max-width: 12rem;
+    font-size: 0.5rem;
+  }
+
+  .accueil-compte span {
+    display: none;
+  }
 }
 
 /* ==========================================================================

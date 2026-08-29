@@ -89,7 +89,7 @@ try {
   const entree = catalogue.find((o) => o.id === demande);
   if (!entree) {
     afficherAccueil(document.getElementById('accueil'), catalogue);
-    document.title = 'Galatée';
+    document.title = 'Pygmalion';
   } else {
 
     prechargerLeVisualiseur();
@@ -107,7 +107,7 @@ try {
     // app.js replaces the heading later if the document's own project sheet
     // carries a title — the manifest name is the fallback, not the authority.
     const nom = manifeste.nom ?? entree.nom ?? entree.id;
-    document.title = `${nom} — Galatée`;
+    document.title = `${nom} — Pygmalion`;
     const titre = document.getElementById('projectTitle');
     if (titre) titre.textContent = nom;
 

@@ -103,3 +103,6 @@ objets/*/annotations/annotations.non-publie.json
 
 # Aperçus rendus hors ligne pour vérifier orientation et sens : outillage, pas site.
 apercus/
+
+# Profil Chrome local utilisé pour les contrôles visuels responsive.
+.chrome-test/
