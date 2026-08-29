@@ -2332,28 +2332,45 @@ body.sur-accueil > *:not(.accueil) { display: none !important; }
 .accueil-logo {
   position: static;
   width: auto;
-  height: clamp(6rem, 8vw, 7rem);
-  margin: 0 0 0.35rem;
+  height: clamp(5rem, 7vw, 6.25rem);
+  margin: 0;
   opacity: 1;
   pointer-events: none;
   filter: drop-shadow(0 0.65rem 1.2rem rgba(20, 33, 31, 0.08));
 }
 
+.accueil-marque {
+  display: flex;
+  gap: clamp(1rem, 2.2vw, 1.8rem);
+  align-items: center;
+}
+
+.accueil-marque-texte {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  text-align: left;
+}
+
 .accueil-surtitre {
-  display: block;
-  margin: 0.9rem 0 0;
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  margin: 0.75rem 0 0;
   color: var(--text);
   font-size: clamp(0.57rem, 0.95vw, 0.7rem);
   font-weight: 520;
   letter-spacing: 0.25em;
-  text-align: center;
 }
 
 .accueil-surtitre::before {
+  content: '';
   display: block;
-  width: 3.8rem;
+  width: 2.4rem;
   height: 2px;
-  margin: 0 auto 0.7rem;
+  margin: 0;
+  flex: 0 0 auto;
   border-radius: 0;
   background: #b13b1d;
   box-shadow: none;
@@ -2602,16 +2619,6 @@ body.sur-accueil > *:not(.accueil) { display: none !important; }
   letter-spacing: -0.035em;
 }
 
-.accueil-invite::before {
-  display: block;
-  margin-bottom: 0.38rem;
-  color: var(--accent);
-  font-size: 0.57rem;
-  font-weight: 680;
-  letter-spacing: 0.14em;
-  content: 'CATALOGUE 3D';
-}
-
 .accueil-aide {
   margin-top: 0.3rem;
   font-size: 0.72rem;
@@ -2789,8 +2796,12 @@ body.sur-accueil > *:not(.accueil) { display: none !important; }
 
   .accueil-logo {
     position: static;
-    height: 6.2rem;
-    margin: 0 0 0.4rem;
+    height: clamp(4rem, 18vw, 5.2rem);
+    margin: 0;
+  }
+
+  .accueil-marque {
+    gap: 0.85rem;
   }
 
   .accueil-figure {
@@ -2799,7 +2810,7 @@ body.sur-accueil > *:not(.accueil) { display: none !important; }
   }
 
   .accueil-titre {
-    font-size: clamp(3.35rem, 15vw, 4.5rem);
+    font-size: clamp(2.6rem, 12vw, 3.7rem);
   }
 
   .accueil-acquisition {

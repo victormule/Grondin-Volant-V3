@@ -99,16 +99,23 @@ export function afficherAccueil(hote, catalogue) {
   titre.className = 'accueil-titre';
   titre.textContent = 'Pygmalion';
 
+  const marqueTexte = document.createElement('div');
+  marqueTexte.className = 'accueil-marque-texte';
+  marqueTexte.append(titre, surtitre);
+
+  const marque = document.createElement('div');
+  marque.className = 'accueil-marque';
+  marque.append(logo, marqueTexte);
+
   const signature = document.createElement('p');
   signature.className = 'accueil-signature';
   signature.textContent = 'Observer, mesurer et documenter le patrimoine en trois dimensions.';
 
   const propos = document.createElement('p');
   propos.className = 'accueil-propos';
-  propos.textContent = 'Les modèles 3D sont acquis avec Dur.air par photogrammétrie ou LiDAR, '
-    + 'puis observés, mesurés, annotés et comparés dans le temps.';
+  propos.textContent = 'Les acquisitions LiDAR et les relevés photogrammétriques sont réalisés à l’aide de l’application Dur.air afin de produire des modèles tridimensionnels du patrimoine. La plateforme Pygmalion permet de visualiser, mesurer, annoter, documenter et partager ces modèles au sein des communautés scientifiques et professionnelles du patrimoine.';
 
-  contenu.append(logo, titre, surtitre, signature, propos, creerAcquisition());
+  contenu.append(marque, signature, propos, creerAcquisition());
   hero.appendChild(contenu);
   entete.append(navigation, hero);
 
@@ -117,7 +124,7 @@ export function afficherAccueil(hote, catalogue) {
   const catalogueTitre = document.createElement('div');
   const invite = document.createElement('h2');
   invite.className = 'accueil-invite';
-  invite.textContent = 'Collection numérique';
+  invite.textContent = 'Catalogue des collections numérisées';
   const aide = document.createElement('p');
   aide.className = 'accueil-aide';
   aide.textContent = 'Sélectionnez un objet pour ouvrir son espace d’étude.';
