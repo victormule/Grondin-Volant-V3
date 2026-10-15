@@ -7,17 +7,26 @@
     "aPlat": false
   },
   "provenance": {
-    "export": "sources/mucem/Project 2026-09-08 #43_export_2026-10-14T13-23-49Z",
-    "commande": "C:\\Users\\Utilisateur\\Desktop\\Grondin-Volant-V3\\outils\\ingerer.mjs \"sources/mucem/Project 2026-09-08 #43_export_2026-10-14T13-23-49Z\" --id mucem --nom Mucem",
-    "ingere": "2026-10-15T03:26:42.172Z"
+    "export": "sources/mucem/export",
+    "commande": "C:\\Users\\Utilisateur\\Desktop\\Grondin-Volant-V3\\outils\\ingerer.mjs sources/mucem/export --id mucem --nom Mucem --maillage LiDAR=sources/mucem/export/sessions/1BF11B65-D971-4C70-B2D4-FDDCFDE3DA08/scene/sparse_cloud_1BF11B65-D971-4C70-B2D4-FDDCFDE3DA08.ply",
+    "ingere": "2026-10-15T03:46:58.522Z"
   },
   "sessions": [
     {
       "id": "1BF11B65-D971-4C70-B2D4-FDDCFDE3DA08",
-      "label": "Capture 1",
+      "label": "Photogrammétrie",
+      "groupe": "Session 1",
       "date": "8 septembre 2026",
       "time": "09:51 – 10:02",
       "glb": "sessions/1BF11B65-D971-4C70-B2D4-FDDCFDE3DA08/model.glb"
+    },
+    {
+      "id": "lidar",
+      "label": "LiDAR",
+      "groupe": "Session 1",
+      "date": "8 septembre 2026",
+      "time": "453 k sommets",
+      "glb": "sessions/lidar/model.glb"
     }
   ],
   "reglages": {

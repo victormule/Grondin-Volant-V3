@@ -131,3 +131,65 @@ export async function lireNuagePLY(chemin, { voxel = 0.02, repereArkit = true } 
   }
   return { positions, couleurs, lus, gardes: n, voxel };
 }
+
+/**
+ * Un PLY de gaussiennes (3D Gaussian Splatting) se reconnaît à ses
+ * coefficients d'harmoniques sphériques : « f_dc_0 » dans l'en-tête.
+ */
+export function estPlyGaussien(chemin) {
+  const fd = fs.openSync(chemin, 'r');
+  try {
+    const tampon = Buffer.alloc(8192);
+    const lus = fs.readSync(fd, tampon, 0, tampon.length, 0);
+    const entete = tampon.subarray(0, lus).toString('latin1').split('end_header')[0];
+    return entete.includes('property float f_dc_0');
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
+ * Lit un PLY de gaussiennes binaire et en fait un nuage de points coloré : le
+ * centre de chaque gaussienne, de la couleur que lui donne son terme d'ordre 0
+ * (couleur = 0,5 + C0 · f_dc, avec C0 = 0,2820948).
+ *
+ * C'EST UN NUAGE DE CENTRES, PAS UN RENDU PAR SPLATS. Le visualiseur affiche des
+ * maillages et des nuages de points ; il ne sait pas étaler une gaussienne.
+ * Les centres disent où le splatting a placé la matière, et leur teinte celle
+ * qu'il lui a donnée — pas la finesse du rendu. Les gaussiennes presque
+ * transparentes (opacité < 0,3) sont écartées : elles servent à lisser le rendu,
+ * elles ne désignent aucune surface.
+ *
+ * LE REPÈRE. Contrairement au sparse_cloud, aucune conversion d'axes : les
+ * positions sont déjà dans le monde ARKit, en mètres (vérifié : médiane à
+ * quelques centimètres de celle du LiDAR de la même session).
+ */
+export function lireGaussianPLY(chemin, { opaciteMin = 0.3 } = {}) {
+  const tout = fs.readFileSync(chemin);
+  const fin = tout.indexOf('end_header\n');
+  if (fin < 0) throw new Error('PLY sans end_header');
+  const lignes = tout.subarray(0, fin).toString('latin1').split('\n');
+  const format = lignes.find((l) => l.startsWith('format '))?.split(/\s+/)[1];
+  if (format !== 'binary_little_endian') throw new Error(`PLY ${format} non pris en charge (binary_little_endian attendu)`);
+  const sommets = Number(lignes.find((l) => l.startsWith('element vertex '))?.split(/\s+/)[2]);
+  const noms = lignes.filter((l) => l.startsWith('property ')).map((l) => l.trim().split(/\s+/));
+  if (noms.some(([, type]) => type !== 'float')) throw new Error('PLY gaussien : propriétés non flottantes');
+  const cols = noms.map(([, , nom]) => nom);
+  const i = (nom) => cols.indexOf(nom);
+  const [ix, iy, iz, r, v, b, io] = ['x', 'y', 'z', 'f_dc_0', 'f_dc_1', 'f_dc_2', 'opacity'].map(i);
+  if ([ix, iy, iz, r, v, b, io].some((k) => k < 0)) throw new Error('PLY gaussien incomplet');
+
+  const donnees = new Float32Array(tout.buffer.slice(tout.byteOffset + fin + 11,
+    tout.byteOffset + fin + 11 + sommets * cols.length * 4));
+  const C0 = 0.28209479177387814;
+  const teinte = (f) => Math.max(0, Math.min(255, Math.round((0.5 + C0 * f) * 255)));
+  const pos = [];
+  const col = [];
+  for (let s = 0; s < sommets; s += 1) {
+    const o = s * cols.length;
+    if (1 / (1 + Math.exp(-donnees[o + io])) < opaciteMin) continue;
+    pos.push(donnees[o + ix], donnees[o + iy], donnees[o + iz]);
+    col.push(teinte(donnees[o + r]), teinte(donnees[o + v]), teinte(donnees[o + b]));
+  }
+  return { positions: Float32Array.from(pos), couleurs: Uint8Array.from(col), lus: sommets, gardes: pos.length / 3, voxel: 0 };
+}

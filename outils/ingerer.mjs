@@ -40,7 +40,7 @@ import { recaler, recalerSansAmorce } from './lib/icp.mjs';
 import { recalerPlan, jugerRecalage } from './lib/icp-plan.mjs';
 import { poseFaceCamera, caleAuSol } from './lib/redressement.mjs';
 import { decouper } from './lib/decoupe.mjs';
-import { lireNuagePLY } from './lib/ply.mjs';
+import { lireNuagePLY, lireGaussianPLY, estPlyGaussien } from './lib/ply.mjs';
 
 /* ------------------------------------------------------------- arguments */
 
@@ -393,9 +393,12 @@ for (const m of maillages) {
   console.log('');
 
   const estNuage = m.chemin.toLowerCase().endsWith('.ply');
-  const donnees = estNuage
-    ? await lireNuagePLY(m.chemin, { voxel: voxelNuage })
-    : lireNuageOBJ(m.chemin);
+  const estGaussien = estNuage && estPlyGaussien(m.chemin);
+  const donnees = estGaussien
+    ? lireGaussianPLY(m.chemin)
+    : estNuage
+      ? await lireNuagePLY(m.chemin, { voxel: voxelNuage })
+      : lireNuageOBJ(m.chemin);
 
   // LA MATRICE D'ARKit PLACE ; ELLE N'AJUSTE PAS.
   //
@@ -500,8 +503,10 @@ for (const m of maillages) {
       debut: ref.debut,
       Mfinal: versObjet,
     });
-    console.log(`nuage « ${m.etiquette} » : ${nuage.lus} points lus, ${nuage.gardes} gardés `
-      + `(un par voxel de ${(nuage.voxel * 100).toFixed(0)} cm), sans recadrage`);
+    console.log(estGaussien
+      ? `gaussiennes « ${m.etiquette} » : ${nuage.lus} lues, ${nuage.gardes} centres gardés (opacité ≥ 0,3), sans recadrage`
+      : `nuage « ${m.etiquette} » : ${nuage.lus} points lus, ${nuage.gardes} gardés `
+        + `(un par voxel de ${(nuage.voxel * 100).toFixed(0)} cm), sans recadrage`);
     console.log('  placé par la matrice d’alignement ARKit de la référence');
     continue;
   }
