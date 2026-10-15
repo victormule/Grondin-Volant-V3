@@ -125,6 +125,10 @@ export class OmbreContact {
   // Called when the model changes, not every frame: nothing here moves.
   rafraichir() {
     this.plan.visible = false;
+    // Une couche de gaussiennes ne projette pas d'ombre : son matériau n'est
+    // pas remplaçable par la profondeur (c'est un quad instancié).
+    const splats = [];
+    this.scene.traverse((o) => { if (o.userData.splat && o.visible) { o.visible = false; splats.push(o); } });
     this.scene.overrideMaterial = this.materiauProfondeur;
 
     this.renderer.setRenderTarget(this.cible);
@@ -132,6 +136,7 @@ export class OmbreContact {
     this.renderer.render(this.scene, this.cameraOmbre);
 
     this.scene.overrideMaterial = null;
+    for (const o of splats) o.visible = true;
 
     const flou = FLOU_MIN + this.config.ombre.douceur * FLOU_AMPLITUDE;
     this._flouter(flou);

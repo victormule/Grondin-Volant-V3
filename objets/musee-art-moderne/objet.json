@@ -9,7 +9,7 @@
   "provenance": {
     "export": "sources/mam/export",
     "commande": "C:\\Users\\Utilisateur\\Desktop\\Grondin-Volant-V3\\outils\\ingerer.mjs sources/mam/export --id musee-art-moderne --nom \"Musée d’art moderne\" --maillage LiDAR=sources/mam/export/sessions/DF6FB602-4D1C-47E4-8AB2-4B165EC86CF4/scene/sparse_cloud_DF6FB602-4D1C-47E4-8AB2-4B165EC86CF4.ply --maillage Gaussien=sources/mam/export/sessions/DF6FB602-4D1C-47E4-8AB2-4B165EC86CF4/gaussian/4931BA55-CB3B-448E-A6BD-E1C7525407B9.ply",
-    "ingere": "2026-10-15T03:46:33.490Z"
+    "ingere": "2026-10-15T04:18:53.893Z"
   },
   "sessions": [
     {
@@ -33,8 +33,8 @@
       "label": "Gaussien",
       "groupe": "Session 1",
       "date": "14 septembre 2026",
-      "time": "131 k sommets",
-      "glb": "sessions/gaussien/model.glb"
+      "time": "Rendu par splats",
+      "splat": "sessions/gaussien/model.splat"
     }
   ],
   "reglages": {

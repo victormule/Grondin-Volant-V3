@@ -56,7 +56,8 @@ export function definirObjet(id, manifeste) {
   objet.racine = racine;
   objet.sessions = (manifeste.sessions ?? []).map((session) => ({
     ...session,
-    glb: `${racine}/${session.glb}`,
+    ...(session.glb ? { glb: `${racine}/${session.glb}` } : {}),
+    ...(session.splat ? { splat: `${racine}/${session.splat}` } : {}),
   }));
   objet.chemins.annotations = `${racine}/annotations/annotations.json`;
   objet.chemins.medias = `${racine}/annotations`;

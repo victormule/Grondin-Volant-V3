@@ -29,7 +29,7 @@ export class AnalyseModele {
 
     racine.updateMatrixWorld(true);
     racine.traverse((objet) => {
-      if (!objet.isMesh || !objet.geometry?.attributes.position) return;
+      if (objet.userData.splat || !objet.isMesh || !objet.geometry?.attributes.position) return;
       this.maillages.push({ objet, decalage: this.nbFaces, nb: nombreDeFaces(objet.geometry) });
       this.nbFaces += nombreDeFaces(objet.geometry);
     });

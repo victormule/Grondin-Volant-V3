@@ -496,7 +496,8 @@ for (const m of maillages) {
     // salle entière est ce que le relevé a relevé.
     publiees.push({
       externe: true,
-      nuagePoints: nuage,
+      nuagePoints: estGaussien ? null : nuage,
+      gaussiens: estGaussien ? nuage.gaussiennes : null,
       etiquette: m.etiquette,
       cle,
       sommets: nuage.gardes,
@@ -561,6 +562,78 @@ for (const c of publiees) {
   // Un nuage de points ne passe par aucune des étapes qui suivent : pas d'OBJ à
   // convertir, pas de texture à rattacher, pas de découpe. On écrit une
   // primitive en mode POINTS, coordonnées déjà cuites, couleurs par sommet.
+  // UN VRAI RENDU PAR SPLATS. Les gaussiennes ne passent pas par un glTF : on
+  // écrit un « .splat » (32 octets par gaussienne, lu par src/viewer/splat.js),
+  // avec la transformation cuite dans les positions, les échelles et les
+  // rotations. La matrice est une similitude — rotation × échelle uniforme —,
+  // si bien que la covariance se transporte sans la recalculer.
+  if (c.gaussiens) {
+    const g = c.gaussiens;
+    const M = c.Mfinal;
+    const s = Math.hypot(M[0], M[1], M[2]);
+    // Rotation pure : les colonnes de la matrice, divisées par l'échelle.
+    const R = [M[0] / s, M[4] / s, M[8] / s, M[1] / s, M[5] / s, M[9] / s, M[2] / s, M[6] / s, M[10] / s];
+    const trace = R[0] + R[4] + R[8];
+    let qw; let qx; let qy; let qz;
+    if (trace > 0) {
+      const k = Math.sqrt(trace + 1) * 2;
+      qw = k / 4; qx = (R[7] - R[5]) / k; qy = (R[2] - R[6]) / k; qz = (R[3] - R[1]) / k;
+    } else if (R[0] > R[4] && R[0] > R[8]) {
+      const k = Math.sqrt(1 + R[0] - R[4] - R[8]) * 2;
+      qw = (R[7] - R[5]) / k; qx = k / 4; qy = (R[1] + R[3]) / k; qz = (R[2] + R[6]) / k;
+    } else if (R[4] > R[8]) {
+      const k = Math.sqrt(1 + R[4] - R[0] - R[8]) * 2;
+      qw = (R[2] - R[6]) / k; qx = (R[1] + R[3]) / k; qy = k / 4; qz = (R[5] + R[7]) / k;
+    } else {
+      const k = Math.sqrt(1 + R[8] - R[0] - R[4]) * 2;
+      qw = (R[3] - R[1]) / k; qx = (R[2] + R[6]) / k; qy = (R[5] + R[7]) / k; qz = k / 4;
+    }
+
+    // On ne garde que les gaussiennes proches de l'objet : celles du décor
+    // lointain (le splat en a jusqu'à trente mètres) ne désignent rien qu'on
+    // veuille regarder, et le tri les fait déborder sur l'objet.
+    const refBoite = boiteFinale;
+    const marge = refBoite.diagonale * 0.05;
+    // Et pas les très grosses : ce sont des taches du décor, étirées sur des
+    // dizaines de centimètres, qui se superposent à l'objet comme des brumes.
+    const tailleMax = refBoite.diagonale * 0.015;
+    const garde = [];
+    const nTotal = g.positions.length / 3;
+    for (let i = 0; i < nTotal; i += 1) {
+      const p = appliquer(M, [g.positions[i * 3], g.positions[i * 3 + 1], g.positions[i * 3 + 2]]);
+      let dedans = true;
+      for (let a = 0; a < 3; a += 1) {
+        if (p[a] < refBoite.mn[a] - marge || p[a] > refBoite.mx[a] + marge) { dedans = false; break; }
+      }
+      const grosse = Math.max(g.echelles[i * 3], g.echelles[i * 3 + 1], g.echelles[i * 3 + 2]) * s > tailleMax;
+      if (dedans && !grosse && g.rgba[i * 4 + 3] >= 3) garde.push([i, p]);
+    }
+
+    const tampon = Buffer.alloc(garde.length * 32);
+    const q8 = (v) => Math.max(0, Math.min(255, Math.round(v * 128 + 128)));
+    garde.forEach(([i, p], k) => {
+      const o = k * 32;
+      tampon.writeFloatLE(p[0], o); tampon.writeFloatLE(p[1], o + 4); tampon.writeFloatLE(p[2], o + 8);
+      for (let a = 0; a < 3; a += 1) tampon.writeFloatLE(g.echelles[i * 3 + a] * s, o + 12 + a * 4);
+      for (let a = 0; a < 4; a += 1) tampon[o + 24 + a] = g.rgba[i * 4 + a];
+      // Q · q, en (w, x, y, z)
+      const w2 = g.quaternions[i * 4]; const x2 = g.quaternions[i * 4 + 1];
+      const y2 = g.quaternions[i * 4 + 2]; const z2 = g.quaternions[i * 4 + 3];
+      const w = qw * w2 - qx * x2 - qy * y2 - qz * z2;
+      const x = qw * x2 + qx * w2 + qy * z2 - qz * y2;
+      const y = qw * y2 - qx * z2 + qy * w2 + qz * x2;
+      const z = qw * z2 + qx * y2 - qy * x2 + qz * w2;
+      const n = Math.hypot(w, x, y, z) || 1;
+      tampon[o + 28] = q8(w / n); tampon[o + 29] = q8(x / n); tampon[o + 30] = q8(y / n); tampon[o + 31] = q8(z / n);
+    });
+    fs.writeFileSync(path.join(sortie, 'model.splat'), tampon);
+    // L'ancien .glb de points, s'il y en avait un, n'a plus de raison d'être.
+    fs.rmSync(path.join(sortie, 'model.glb'), { force: true });
+    console.log(`  ${etiqueter(c)}  model.splat ${(tampon.length / 1048576).toFixed(1)} Mo  — `
+      + `${garde.length} gaussiennes sur ${nTotal} (échelle ×${s.toFixed(3)})`);
+    continue;
+  }
+
   if (c.nuagePoints) {
     const { positions, couleurs } = c.nuagePoints;
     const places = new Float32Array(positions.length);
@@ -721,8 +794,10 @@ const manifeste = {
           label: c.etiquette,
           groupe: sessionDeReference,
           date: dateFr(c.debut),
-          time: `${Math.round(c.sommets / 1000)} k sommets`,
-          glb: `sessions/${c.cle}/model.glb`,
+          time: c.gaussiens ? 'Rendu par splats' : `${Math.round(c.sommets / 1000)} k sommets`,
+          ...(c.gaussiens
+            ? { splat: `sessions/${c.cle}/model.splat` }
+            : { glb: `sessions/${c.cle}/model.glb` }),
         };
       }
       const plusieurs = parCapture.get(c.sid) > 1;

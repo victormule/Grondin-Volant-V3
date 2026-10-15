@@ -98,7 +98,7 @@ export class AtlasPeinture {
     const scene = new THREE.Scene();
     racine.updateMatrixWorld(true);
     racine.traverse((objet) => {
-      if (!objet.isMesh || !objet.geometry?.attributes.uv) return;
+      if (objet.userData.splat || !objet.isMesh || !objet.geometry?.attributes.uv) return;
       const proxy = new THREE.Mesh(objet.geometry, this.matEmpreintes);
       proxy.frustumCulled = false;
       proxy.matrixAutoUpdate = false;
@@ -449,7 +449,7 @@ export class AtlasPeinture {
       // l'atlas en (0,0) et teintait tout le nuage de la couleur qui s'y trouve.
       // Le relevé LiDAR du muséum est un nuage ; il s'affiche, il ne se peint
       // pas, et c'est ici que la distinction se fait.
-      if (!objet.isMesh) return;
+      if (!objet.isMesh || objet.userData.splat) return;
       for (const m of Array.isArray(objet.material) ? objet.material : [objet.material]) {
         if (m.userData.__atlasBranche) {
           m.userData.__atlasUniforme.value = texture;

@@ -49,6 +49,7 @@ export function chargerModele(url, surProgression) {
 export function appliquerMatiere(racine, { rugosite, metal, opacite = 1, anisotropie }) {
   const facteurOpacite = THREE.MathUtils.clamp(Number(opacite), 0, 1);
   racine.traverse((objet) => {
+    if (objet.userData.splat) { objet.definirOpacite(facteurOpacite); return; }
     if (!objet.material) return;
     for (const m of Array.isArray(objet.material) ? objet.material : [objet.material]) {
       // Un nuage de points n'est pas branché sur l'atlas : son opacité ne

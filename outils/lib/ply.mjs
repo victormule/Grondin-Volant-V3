@@ -183,13 +183,36 @@ export function lireGaussianPLY(chemin, { opaciteMin = 0.3 } = {}) {
     tout.byteOffset + fin + 11 + sommets * cols.length * 4));
   const C0 = 0.28209479177387814;
   const teinte = (f) => Math.max(0, Math.min(255, Math.round((0.5 + C0 * f) * 255)));
+  const [is0, is1, is2, ir0, ir1, ir2, ir3] = ['scale_0', 'scale_1', 'scale_2', 'rot_0', 'rot_1', 'rot_2', 'rot_3'].map(i);
+  if ([is0, is1, is2, ir0, ir1, ir2, ir3].some((k) => k < 0)) throw new Error('PLY gaussien sans échelle ou rotation');
   const pos = [];
   const col = [];
+  // Tout ce qu'il faut pour rendre la gaussienne, pas seulement son centre :
+  // échelles linéaires (le PLY les stocke en log), quaternion normalisé (w, x,
+  // y, z), couleur et opacité. Le nuage de centres, lui, écarte les
+  // translucides ; le rendu par splats les garde toutes.
+  const gaussiennes = {
+    positions: new Float32Array(sommets * 3),
+    echelles: new Float32Array(sommets * 3),
+    quaternions: new Float32Array(sommets * 4),
+    rgba: new Uint8Array(sommets * 4),
+  };
   for (let s = 0; s < sommets; s += 1) {
     const o = s * cols.length;
-    if (1 / (1 + Math.exp(-donnees[o + io])) < opaciteMin) continue;
+    const alpha = 1 / (1 + Math.exp(-donnees[o + io]));
+    gaussiennes.positions.set([donnees[o + ix], donnees[o + iy], donnees[o + iz]], s * 3);
+    gaussiennes.echelles.set([Math.exp(donnees[o + is0]), Math.exp(donnees[o + is1]), Math.exp(donnees[o + is2])], s * 3);
+    const q = [donnees[o + ir0], donnees[o + ir1], donnees[o + ir2], donnees[o + ir3]];
+    const nq = Math.hypot(...q) || 1;
+    gaussiennes.quaternions.set(q.map((c) => c / nq), s * 4);
+    gaussiennes.rgba.set([teinte(donnees[o + r]), teinte(donnees[o + v]), teinte(donnees[o + b]),
+      Math.round(alpha * 255)], s * 4);
+    if (alpha < opaciteMin) continue;
     pos.push(donnees[o + ix], donnees[o + iy], donnees[o + iz]);
     col.push(teinte(donnees[o + r]), teinte(donnees[o + v]), teinte(donnees[o + b]));
   }
-  return { positions: Float32Array.from(pos), couleurs: Uint8Array.from(col), lus: sommets, gardes: pos.length / 3, voxel: 0 };
+  return {
+    positions: Float32Array.from(pos), couleurs: Uint8Array.from(col),
+    lus: sommets, gardes: pos.length / 3, voxel: 0, gaussiennes,
+  };
 }

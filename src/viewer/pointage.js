@@ -87,7 +87,7 @@ export class Pointeur {
     };
 
     couche.traverse((objet) => {
-      if (!objet.isMesh || !objet.geometry?.attributes?.position) return;
+      if (objet.userData.splat || !objet.isMesh || !objet.geometry?.attributes?.position) return;
       const boite = this._boiteMateriauPrincipal(objet);
       if (boite && !boite.isEmpty()) projeter(objet, boite);
     });

@@ -6,6 +6,7 @@ import { Scene3D, opacitesEquilibrees } from './viewer/scene3d.js';
 import { Eclairage } from './viewer/eclairage.js';
 import { OmbreContact } from './viewer/ombre.js';
 import { chargerModele, appliquerMatiere } from './viewer/modeles.js';
+import { chargerSplat } from './viewer/splat.js';
 import { installerPanneau, exclusiviteMobile } from './ui/panneaux.js';
 import {
   DocumentAnnotation, creerCalque, creerEpingle, calquePorte, genreElement, identifiant,
@@ -1793,7 +1794,7 @@ async function obtenirCouche(session, index) {
   const chargement = (async () => {
 
     afficherStatut(`Chargement · ${session.label}…`);
-    const { racine, boite } = await chargerModele(session.glb, (part) => {
+    const { racine, boite } = await (session.splat ? chargerSplat : chargerModele)(session.splat ?? session.glb, (part) => {
       afficherStatut(`Chargement · ${session.label} · ${Math.round(part * 100)} %`);
     });
 
