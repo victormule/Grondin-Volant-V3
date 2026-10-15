@@ -1,0 +1,53 @@
+{
+  "nom": "Mucem",
+  "repere": "mucem/oc-redresse-2026-10",
+  "recalage": "sessions/_recalage.json",
+  "redressement": {
+    "rotationFace": 0,
+    "aPlat": false
+  },
+  "provenance": {
+    "export": "sources/mucem/Project 2026-09-08 #43_export_2026-10-14T13-23-49Z",
+    "commande": "C:\\Users\\Utilisateur\\Desktop\\Grondin-Volant-V3\\outils\\ingerer.mjs \"sources/mucem/Project 2026-09-08 #43_export_2026-10-14T13-23-49Z\" --id mucem --nom Mucem",
+    "ingere": "2026-10-15T03:26:42.172Z"
+  },
+  "sessions": [
+    {
+      "id": "1BF11B65-D971-4C70-B2D4-FDDCFDE3DA08",
+      "label": "Capture 1",
+      "date": "8 septembre 2026",
+      "time": "09:51 – 10:02",
+      "glb": "sessions/1BF11B65-D971-4C70-B2D4-FDDCFDE3DA08/model.glb"
+    }
+  ],
+  "reglages": {
+    "camera": {
+      "distanceMin": 0.23,
+      "distanceMax": 11
+    },
+    "peinture": {
+      "taille": 42,
+      "tailleGomme": 50
+    },
+    "affichage": {
+      "vueInitiale": {
+        "azimut": 0,
+        "elevation": 0,
+        "marge": 1.02
+      },
+      "aplomb": null,
+      "axeRotation": {
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ]
+      }
+    }
+  }
+}

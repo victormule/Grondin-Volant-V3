@@ -1,0 +1,11 @@
+{
+  "version": 3,
+  "repere": "mucem/oc-redresse-2026-10",
+  "sessionReference": "1BF11B65-D971-4C70-B2D4-FDDCFDE3DA08",
+  "racine": {
+    "id": "racine",
+    "type": "groupe",
+    "enfants": []
+  },
+  "medias": []
+}

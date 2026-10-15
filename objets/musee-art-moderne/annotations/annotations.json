@@ -1,0 +1,11 @@
+{
+  "version": 3,
+  "repere": "musee-art-moderne/oc-redresse-2026-10",
+  "sessionReference": "DF6FB602-4D1C-47E4-8AB2-4B165EC86CF4",
+  "racine": {
+    "id": "racine",
+    "type": "groupe",
+    "enfants": []
+  },
+  "medias": []
+}

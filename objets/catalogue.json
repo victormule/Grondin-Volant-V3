@@ -28,5 +28,15 @@
     "id": "musee-histoire-naturelle",
     "nom": "Musée d’histoire naturelle",
     "detail": "Spécimen naturalisé au sol · photogrammétrie et nuage LiDAR"
+  },
+  {
+    "id": "mucem",
+    "nom": "Mucem",
+    "detail": "Objet rouge devant une paroi bleue · une capture"
+  },
+  {
+    "id": "musee-art-moderne",
+    "nom": "Musée d’art moderne",
+    "detail": "Objet posé sur un socle blanc · une capture"
   }
 ]

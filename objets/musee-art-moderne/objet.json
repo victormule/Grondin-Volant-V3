@@ -1,0 +1,53 @@
+{
+  "nom": "Musée d’art moderne",
+  "repere": "musee-art-moderne/oc-redresse-2026-10",
+  "recalage": "sessions/_recalage.json",
+  "redressement": {
+    "rotationFace": 0,
+    "aPlat": false
+  },
+  "provenance": {
+    "export": "sources/mam/Project 2026-09-14 #44_export_2026-10-14T13-34-17Z",
+    "commande": "C:\\Users\\Utilisateur\\Desktop\\Grondin-Volant-V3\\outils\\ingerer.mjs \"sources/mam/Project 2026-09-14 #44_export_2026-10-14T13-34-17Z\" --id musee-art-moderne --nom \"Musée d’art moderne\"",
+    "ingere": "2026-10-15T03:26:47.937Z"
+  },
+  "sessions": [
+    {
+      "id": "DF6FB602-4D1C-47E4-8AB2-4B165EC86CF4",
+      "label": "Capture 1",
+      "date": "14 septembre 2026",
+      "time": "14:35 – 14:40",
+      "glb": "sessions/DF6FB602-4D1C-47E4-8AB2-4B165EC86CF4/model.glb"
+    }
+  ],
+  "reglages": {
+    "camera": {
+      "distanceMin": 0.1,
+      "distanceMax": 4.9
+    },
+    "peinture": {
+      "taille": 18,
+      "tailleGomme": 22
+    },
+    "affichage": {
+      "vueInitiale": {
+        "azimut": 0,
+        "elevation": 0,
+        "marge": 1.02
+      },
+      "aplomb": null,
+      "axeRotation": {
+        "point": [
+          0,
+          0,
+          0
+        ],
+        "direction": [
+          0,
+          1,
+          0
+        ]
+      }
+    }
+  }
+}
